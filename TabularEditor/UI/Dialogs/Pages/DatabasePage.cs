@@ -7,7 +7,6 @@ using System.Windows.Forms;
 using TOM = Microsoft.AnalysisServices.Tabular;
 using System.Globalization;
 using TabularEditor.UIServices;
-using TabularEditor.UI.Extensions;
 using AS = Microsoft.AnalysisServices;
 
 namespace TabularEditor.UI.Dialogs.Pages
@@ -31,19 +30,43 @@ namespace TabularEditor.UI.Dialogs.Pages
 
         internal void EnableColumnFilters()
         {
-            var filterPanel = new Panel { BackColor = SystemColors.Control };
+            var filterPanel = new Panel { BackColor = dataGridView1.BackgroundColor };
             dataGridView1.Controls.Add(filterPanel);
 
             foreach (DataGridViewColumn column in dataGridView1.Columns)
             {
                 if (string.IsNullOrEmpty(column.DataPropertyName)) continue;
 
-                var filter = new TextBox { AccessibleName = "Filter " + column.HeaderText };
+                var filter = new TextBox
+                {
+                    AccessibleName = "Filter " + column.HeaderText,
+                    BackColor = filterPanel.BackColor,
+                    BorderStyle = BorderStyle.None
+                };
                 columnFilters.Add(column, filter);
                 filterPanel.Controls.Add(filter);
-                filter.HandleCreated += (sender, args) => filter.SetCueBanner(filter.AccessibleName);
+                filter.GotFocus += (sender, args) => filterPanel.Invalidate();
+                filter.LostFocus += (sender, args) => filterPanel.Invalidate();
                 filter.TextChanged += (sender, args) => ApplyColumnFilters();
             }
+
+            filterPanel.Paint += (sender, args) =>
+            {
+                var bottom = filterPanel.ClientSize.Height - 1;
+                var right = filterPanel.ClientSize.Width - 1;
+                args.Graphics.DrawLine(SystemPens.ControlLight, 0, 0, right, 0);
+                args.Graphics.DrawLine(SystemPens.ControlLight, 0, bottom, right, bottom);
+                args.Graphics.DrawLine(SystemPens.ControlLight, DatabaseIcon.Width - 1, 0, DatabaseIcon.Width - 1, bottom);
+                foreach (var filter in columnFilters.Values)
+                {
+                    if (!filter.Visible) continue;
+
+                    var columnRight = filter.Right + 1;
+                    args.Graphics.DrawLine(SystemPens.ControlLight, columnRight, 0, columnRight, bottom);
+                    if (filter.Focused)
+                        args.Graphics.DrawRectangle(SystemPens.Highlight, filter.Left - 2, 0, filter.Width + 3, bottom);
+                }
+            };
 
             void LayoutColumnFilters()
             {
@@ -66,6 +89,7 @@ namespace TabularEditor.UI.Dialogs.Pages
                     if (width > 4)
                         entry.Value.SetBounds(left - filterPanel.Left + 2, 2, width - 4, entry.Value.PreferredHeight);
                 }
+                filterPanel.Invalidate();
             }
 
             dataGridView1.Scroll += (sender, args) =>
