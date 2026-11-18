@@ -86,12 +86,6 @@ namespace TabularEditor
             this.fromDBToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.exitToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.btnConnect = new System.Windows.Forms.ToolStripButton();
-            this.tbShowDisplayFolders = new System.Windows.Forms.ToolStripButton();
-            this.tbShowHidden = new System.Windows.Forms.ToolStripButton();
-            this.tbShowMeasures = new System.Windows.Forms.ToolStripButton();
-            this.tbShowColumns = new System.Windows.Forms.ToolStripButton();
-            this.tbShowHierarchies = new System.Windows.Forms.ToolStripButton();
-            this.toolStripButton6 = new System.Windows.Forms.ToolStripButton();
             this.btnSave = new System.Windows.Forms.ToolStripButton();
             this.saveToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.saveAsToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
@@ -103,6 +97,8 @@ namespace TabularEditor
             this.mEasToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.xToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.yToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.partitionsToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.calendarsToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.metadataInformationToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.expandAllToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.collapseAllToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
@@ -120,9 +116,7 @@ namespace TabularEditor
             this.copyToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.pasteToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.selectAllToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.tbShowAllObjectTypes = new System.Windows.Forms.ToolStripButton();
             this.showAllObjectTypesToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.tbSortAlphabetically = new System.Windows.Forms.ToolStripButton();
             this.sortAlphabeticalToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.toolStripButton1 = new System.Windows.Forms.ToolStripButton();
             this.toolStripButton2 = new System.Windows.Forms.ToolStripButton();
@@ -146,8 +140,6 @@ namespace TabularEditor
             this.toolStripButton14 = new System.Windows.Forms.ToolStripButton();
             this.toolStripButton15 = new System.Windows.Forms.ToolStripButton();
             this.goToDefinitionToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
-            this.toolStripButton16 = new System.Windows.Forms.ToolStripButton();
-            this.toolStripButton17 = new System.Windows.Forms.ToolStripButton();
             this.bestPracticeAnalyzerToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.longFormatToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.shortFormatToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
@@ -156,11 +148,7 @@ namespace TabularEditor
             this.preferencesToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.toolStrip2 = new System.Windows.Forms.ToolStrip();
             this.toolStripSeparator3 = new System.Windows.Forms.ToolStripSeparator();
-            this.toolStripSeparator22 = new System.Windows.Forms.ToolStripSeparator();
-            this.toolStripLabel1 = new System.Windows.Forms.ToolStripLabel();
             this.cmbPerspective = new System.Windows.Forms.ToolStripComboBox();
-            this.toolStripSeparator5 = new System.Windows.Forms.ToolStripSeparator();
-            this.toolStripLabel2 = new System.Windows.Forms.ToolStripLabel();
             this.cmbTranslation = new System.Windows.Forms.ToolStripComboBox();
             this.txtFilter = new TabularEditor.ToolStripSpringTextBox();
             this.toolModelSearch = new System.Windows.Forms.ToolStrip();
@@ -187,10 +175,6 @@ namespace TabularEditor
             this.nodeTextBox4 = new Aga.Controls.Tree.NodeControls.NodeTextBox();
             this.nodeTextBox5 = new Aga.Controls.Tree.NodeControls.NodeTextBox();
             this.nodeTextBox7 = new Aga.Controls.Tree.NodeControls.NodeTextBox();
-            this.toolTreeView = new System.Windows.Forms.ToolStrip();
-            this.toolStripLabel3 = new System.Windows.Forms.ToolStripLabel();
-            this.toolStripSeparator2 = new System.Windows.Forms.ToolStripSeparator();
-            this.toolStripSeparator6 = new System.Windows.Forms.ToolStripSeparator();
             this.splitContainer2 = new System.Windows.Forms.SplitContainer();
             this.tabCodeEditors = new TabularEditor.UI.ThemedTabControl();
             this.pgExpressionEditor = new System.Windows.Forms.TabPage();
@@ -215,7 +199,6 @@ namespace TabularEditor
             this.macroToolStripSeparator = new System.Windows.Forms.ToolStripSeparator();
             this.toolStripSeparator10 = new System.Windows.Forms.ToolStripSeparator();
             this.toolStripSeparator1 = new System.Windows.Forms.ToolStripSeparator();
-            this.toolStripSeparator20 = new System.Windows.Forms.ToolStripSeparator();
             this.toolStripComboBox1 = new System.Windows.Forms.ToolStripComboBox();
             this.propertyGrid1 = new TabularEditor.PropertyGridExtension.NavigatablePropertyGrid();
             this.tvMenu = new System.Windows.Forms.ContextMenuStrip(this.components);
@@ -269,7 +252,6 @@ namespace TabularEditor
             this.splitContainer1.Panel1.SuspendLayout();
             this.splitContainer1.Panel2.SuspendLayout();
             this.splitContainer1.SuspendLayout();
-            this.toolTreeView.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.splitContainer2)).BeginInit();
             this.splitContainer2.Panel1.SuspendLayout();
             this.splitContainer2.Panel2.SuspendLayout();
@@ -346,9 +328,9 @@ namespace TabularEditor
             this.actToggleDisplayFolders.CheckState = System.Windows.Forms.CheckState.Checked;
             this.actToggleDisplayFolders.Enabled = false;
             this.actToggleDisplayFolders.Image = global::TabularEditor.Resources.FolderOpen;
-            this.actToggleDisplayFolders.ShortcutKeys = ((System.Windows.Forms.Keys)((System.Windows.Forms.Keys.Control | System.Windows.Forms.Keys.D4)));
+            this.actToggleDisplayFolders.ShortcutKeys = ((System.Windows.Forms.Keys)((System.Windows.Forms.Keys.Control | System.Windows.Forms.Keys.D6)));
             this.actToggleDisplayFolders.Text = "&Display Folders";
-            this.actToggleDisplayFolders.ToolTipText = "Show/hide display folders (Ctrl+4)";
+            this.actToggleDisplayFolders.ToolTipText = "Show/hide display folders (Ctrl+6)";
             this.actToggleDisplayFolders.Execute += new System.EventHandler(this.actViewOptions_Execute);
             // 
             // actToggleHidden
@@ -356,9 +338,9 @@ namespace TabularEditor
             this.actToggleHidden.CheckOnClick = true;
             this.actToggleHidden.Enabled = false;
             this.actToggleHidden.Image = global::TabularEditor.Resources.Hidden;
-            this.actToggleHidden.ShortcutKeys = ((System.Windows.Forms.Keys)((System.Windows.Forms.Keys.Control | System.Windows.Forms.Keys.D5)));
+            this.actToggleHidden.ShortcutKeys = ((System.Windows.Forms.Keys)((System.Windows.Forms.Keys.Control | System.Windows.Forms.Keys.D7)));
             this.actToggleHidden.Text = "&Hidden Objects";
-            this.actToggleHidden.ToolTipText = "Show/hide hidden objects (Ctrl+5)";
+            this.actToggleHidden.ToolTipText = "Show/hide hidden objects (Ctrl+7)";
             this.actToggleHidden.Execute += new System.EventHandler(this.actViewOptions_Execute);
             // 
             // actToggleOrderByName
@@ -391,9 +373,9 @@ namespace TabularEditor
             this.actTogglePartitions.CheckOnClick = true;
             this.actTogglePartitions.CheckState = System.Windows.Forms.CheckState.Checked;
             this.actTogglePartitions.Enabled = false;
-            this.actTogglePartitions.ShortcutKeys = ((System.Windows.Forms.Keys)((System.Windows.Forms.Keys.Control | System.Windows.Forms.Keys.D6)));
+            this.actTogglePartitions.ShortcutKeys = ((System.Windows.Forms.Keys)((System.Windows.Forms.Keys.Control | System.Windows.Forms.Keys.D4)));
             this.actTogglePartitions.Text = "&Partitions";
-            this.actTogglePartitions.ToolTipText = "Show/hide partitions (Ctrl+6)";
+            this.actTogglePartitions.ToolTipText = "Show/hide partitions (Ctrl+4)";
             this.actTogglePartitions.Execute += new System.EventHandler(this.actViewOptions_Execute);
             // 
             // actToggleCalendars
@@ -402,9 +384,9 @@ namespace TabularEditor
             this.actToggleCalendars.CheckOnClick = true;
             this.actToggleCalendars.CheckState = System.Windows.Forms.CheckState.Checked;
             this.actToggleCalendars.Enabled = false;
-            this.actToggleCalendars.ShortcutKeys = ((System.Windows.Forms.Keys)((System.Windows.Forms.Keys.Control | System.Windows.Forms.Keys.D7)));
+            this.actToggleCalendars.ShortcutKeys = ((System.Windows.Forms.Keys)((System.Windows.Forms.Keys.Control | System.Windows.Forms.Keys.D5)));
             this.actToggleCalendars.Text = "C&alendars";
-            this.actToggleCalendars.ToolTipText = "Show/hide calendars (Ctrl+7)";
+            this.actToggleCalendars.ToolTipText = "Show/hide calendars (Ctrl+5)";
             this.actToggleCalendars.Execute += new System.EventHandler(this.actViewOptions_Execute);
             // 
             // actToggleColumns
@@ -814,97 +796,6 @@ namespace TabularEditor
             this.btnConnect.Text = "From &DB...";
             this.btnConnect.ToolTipText = "Open a Tabular Model from an existing database (Ctrl+Shift+O)";
             // 
-            // tbShowDisplayFolders
-            // 
-            actionsMain.SetAction(this.tbShowDisplayFolders, this.actToggleDisplayFolders);
-            this.tbShowDisplayFolders.AutoToolTip = false;
-            this.tbShowDisplayFolders.Checked = true;
-            this.tbShowDisplayFolders.CheckOnClick = true;
-            this.tbShowDisplayFolders.CheckState = System.Windows.Forms.CheckState.Checked;
-            this.tbShowDisplayFolders.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image;
-            this.tbShowDisplayFolders.Enabled = false;
-            this.tbShowDisplayFolders.Image = global::TabularEditor.Resources.FolderOpen;
-            this.tbShowDisplayFolders.ImageTransparentColor = System.Drawing.Color.Magenta;
-            this.tbShowDisplayFolders.Name = "tbShowDisplayFolders";
-            this.tbShowDisplayFolders.Size = new System.Drawing.Size(23, 22);
-            this.tbShowDisplayFolders.Text = "&Display Folders";
-            this.tbShowDisplayFolders.ToolTipText = "Show/hide display folders (Ctrl+4)";
-            // 
-            // tbShowHidden
-            // 
-            actionsMain.SetAction(this.tbShowHidden, this.actToggleHidden);
-            this.tbShowHidden.AutoToolTip = false;
-            this.tbShowHidden.CheckOnClick = true;
-            this.tbShowHidden.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image;
-            this.tbShowHidden.Enabled = false;
-            this.tbShowHidden.Image = global::TabularEditor.Resources.Hidden;
-            this.tbShowHidden.ImageTransparentColor = System.Drawing.Color.Magenta;
-            this.tbShowHidden.Name = "tbShowHidden";
-            this.tbShowHidden.Size = new System.Drawing.Size(23, 22);
-            this.tbShowHidden.Text = "&Hidden Objects";
-            this.tbShowHidden.ToolTipText = "Show/hide hidden objects (Ctrl+5)";
-            // 
-            // tbShowMeasures
-            // 
-            actionsMain.SetAction(this.tbShowMeasures, this.actToggleMeasures);
-            this.tbShowMeasures.AutoToolTip = false;
-            this.tbShowMeasures.Checked = true;
-            this.tbShowMeasures.CheckOnClick = true;
-            this.tbShowMeasures.CheckState = System.Windows.Forms.CheckState.Checked;
-            this.tbShowMeasures.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image;
-            this.tbShowMeasures.Enabled = false;
-            this.tbShowMeasures.Image = global::TabularEditor.Resources.Sigma;
-            this.tbShowMeasures.ImageTransparentColor = System.Drawing.Color.Magenta;
-            this.tbShowMeasures.Name = "tbShowMeasures";
-            this.tbShowMeasures.Size = new System.Drawing.Size(23, 22);
-            this.tbShowMeasures.Text = "&Measures";
-            this.tbShowMeasures.ToolTipText = "Show/hide measures (Ctrl+1)";
-            // 
-            // tbShowColumns
-            // 
-            actionsMain.SetAction(this.tbShowColumns, this.actToggleColumns);
-            this.tbShowColumns.AutoToolTip = false;
-            this.tbShowColumns.Checked = true;
-            this.tbShowColumns.CheckOnClick = true;
-            this.tbShowColumns.CheckState = System.Windows.Forms.CheckState.Checked;
-            this.tbShowColumns.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image;
-            this.tbShowColumns.Enabled = false;
-            this.tbShowColumns.Image = global::TabularEditor.Resources.Column;
-            this.tbShowColumns.ImageTransparentColor = System.Drawing.Color.Magenta;
-            this.tbShowColumns.Name = "tbShowColumns";
-            this.tbShowColumns.Size = new System.Drawing.Size(23, 22);
-            this.tbShowColumns.Text = "&Columns";
-            this.tbShowColumns.ToolTipText = "Show/hide columns (Ctrl+2)";
-            // 
-            // tbShowHierarchies
-            // 
-            actionsMain.SetAction(this.tbShowHierarchies, this.actToggleHierarchies);
-            this.tbShowHierarchies.AutoToolTip = false;
-            this.tbShowHierarchies.Checked = true;
-            this.tbShowHierarchies.CheckOnClick = true;
-            this.tbShowHierarchies.CheckState = System.Windows.Forms.CheckState.Checked;
-            this.tbShowHierarchies.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image;
-            this.tbShowHierarchies.Enabled = false;
-            this.tbShowHierarchies.Image = global::TabularEditor.Resources.Hierarchy;
-            this.tbShowHierarchies.ImageTransparentColor = System.Drawing.Color.Magenta;
-            this.tbShowHierarchies.Name = "tbShowHierarchies";
-            this.tbShowHierarchies.Size = new System.Drawing.Size(23, 22);
-            this.tbShowHierarchies.Text = "H&ierarchies";
-            this.tbShowHierarchies.ToolTipText = "Show/hide hierarchies (Ctrl+3)";
-            // 
-            // toolStripButton6
-            // 
-            actionsMain.SetAction(this.toolStripButton6, this.actToggleInfoColumns);
-            this.toolStripButton6.AutoToolTip = false;
-            this.toolStripButton6.CheckOnClick = true;
-            this.toolStripButton6.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image;
-            this.toolStripButton6.Image = global::TabularEditor.Resources.Columns;
-            this.toolStripButton6.ImageTransparentColor = System.Drawing.Color.Magenta;
-            this.toolStripButton6.Name = "toolStripButton6";
-            this.toolStripButton6.Size = new System.Drawing.Size(23, 22);
-            this.toolStripButton6.Text = "Meta&data Information";
-            this.toolStripButton6.ToolTipText = "Show/hide metadata information columns (Ctrl+F1)";
-            // 
             // btnSave
             // 
             actionsMain.SetAction(this.btnSave, this.actSave);
@@ -974,11 +865,11 @@ namespace TabularEditor
             this.displayFoldersToolStripMenuItem.Enabled = false;
             this.displayFoldersToolStripMenuItem.Image = global::TabularEditor.Resources.FolderOpen;
             this.displayFoldersToolStripMenuItem.Name = "displayFoldersToolStripMenuItem";
-            this.displayFoldersToolStripMenuItem.ShortcutKeyDisplayString = "Ctrl+4";
-            this.displayFoldersToolStripMenuItem.ShortcutKeys = ((System.Windows.Forms.Keys)((System.Windows.Forms.Keys.Control | System.Windows.Forms.Keys.D4)));
+            this.displayFoldersToolStripMenuItem.ShortcutKeyDisplayString = "Ctrl+6";
+            this.displayFoldersToolStripMenuItem.ShortcutKeys = ((System.Windows.Forms.Keys)((System.Windows.Forms.Keys.Control | System.Windows.Forms.Keys.D6)));
             this.displayFoldersToolStripMenuItem.Size = new System.Drawing.Size(237, 22);
             this.displayFoldersToolStripMenuItem.Text = "&Display Folders";
-            this.displayFoldersToolStripMenuItem.ToolTipText = "Show/hide display folders (Ctrl+4)";
+            this.displayFoldersToolStripMenuItem.ToolTipText = "Show/hide display folders (Ctrl+6)";
             // 
             // hiddenObjectsToolStripMenuItem
             // 
@@ -987,11 +878,11 @@ namespace TabularEditor
             this.hiddenObjectsToolStripMenuItem.Enabled = false;
             this.hiddenObjectsToolStripMenuItem.Image = global::TabularEditor.Resources.Hidden;
             this.hiddenObjectsToolStripMenuItem.Name = "hiddenObjectsToolStripMenuItem";
-            this.hiddenObjectsToolStripMenuItem.ShortcutKeyDisplayString = "Ctrl+5";
-            this.hiddenObjectsToolStripMenuItem.ShortcutKeys = ((System.Windows.Forms.Keys)((System.Windows.Forms.Keys.Control | System.Windows.Forms.Keys.D5)));
+            this.hiddenObjectsToolStripMenuItem.ShortcutKeyDisplayString = "Ctrl+7";
+            this.hiddenObjectsToolStripMenuItem.ShortcutKeys = ((System.Windows.Forms.Keys)((System.Windows.Forms.Keys.Control | System.Windows.Forms.Keys.D7)));
             this.hiddenObjectsToolStripMenuItem.Size = new System.Drawing.Size(237, 22);
             this.hiddenObjectsToolStripMenuItem.Text = "&Hidden Objects";
-            this.hiddenObjectsToolStripMenuItem.ToolTipText = "Show/hide hidden objects (Ctrl+5)";
+            this.hiddenObjectsToolStripMenuItem.ToolTipText = "Show/hide hidden objects (Ctrl+7)";
             // 
             // mEasToolStripMenuItem
             // 
@@ -1038,6 +929,34 @@ namespace TabularEditor
             this.yToolStripMenuItem.Text = "H&ierarchies";
             this.yToolStripMenuItem.ToolTipText = "Show/hide hierarchies (Ctrl+3)";
             // 
+            // partitionsToolStripMenuItem
+            //
+            actionsMain.SetAction(this.partitionsToolStripMenuItem, this.actTogglePartitions);
+            this.partitionsToolStripMenuItem.Checked = true;
+            this.partitionsToolStripMenuItem.CheckOnClick = true;
+            this.partitionsToolStripMenuItem.CheckState = System.Windows.Forms.CheckState.Checked;
+            this.partitionsToolStripMenuItem.Enabled = false;
+            this.partitionsToolStripMenuItem.Name = "partitionsToolStripMenuItem";
+            this.partitionsToolStripMenuItem.ShortcutKeyDisplayString = "Ctrl+4";
+            this.partitionsToolStripMenuItem.ShortcutKeys = ((System.Windows.Forms.Keys)((System.Windows.Forms.Keys.Control | System.Windows.Forms.Keys.D4)));
+            this.partitionsToolStripMenuItem.Size = new System.Drawing.Size(237, 22);
+            this.partitionsToolStripMenuItem.Text = "&Partitions";
+            this.partitionsToolStripMenuItem.ToolTipText = "Show/hide partitions (Ctrl+4)";
+            //
+            // calendarsToolStripMenuItem
+            //
+            actionsMain.SetAction(this.calendarsToolStripMenuItem, this.actToggleCalendars);
+            this.calendarsToolStripMenuItem.Checked = true;
+            this.calendarsToolStripMenuItem.CheckOnClick = true;
+            this.calendarsToolStripMenuItem.CheckState = System.Windows.Forms.CheckState.Checked;
+            this.calendarsToolStripMenuItem.Enabled = false;
+            this.calendarsToolStripMenuItem.Name = "calendarsToolStripMenuItem";
+            this.calendarsToolStripMenuItem.ShortcutKeyDisplayString = "Ctrl+5";
+            this.calendarsToolStripMenuItem.ShortcutKeys = ((System.Windows.Forms.Keys)((System.Windows.Forms.Keys.Control | System.Windows.Forms.Keys.D5)));
+            this.calendarsToolStripMenuItem.Size = new System.Drawing.Size(237, 22);
+            this.calendarsToolStripMenuItem.Text = "C&alendars";
+            this.calendarsToolStripMenuItem.ToolTipText = "Show/hide calendars (Ctrl+5)";
+            //
             // metadataInformationToolStripMenuItem
             // 
             actionsMain.SetAction(this.metadataInformationToolStripMenuItem, this.actToggleInfoColumns);
@@ -1221,23 +1140,6 @@ namespace TabularEditor
             this.selectAllToolStripMenuItem.Text = "Select &All";
             this.selectAllToolStripMenuItem.ToolTipText = "Select All";
             // 
-            // tbShowAllObjectTypes
-            // 
-            actionsMain.SetAction(this.tbShowAllObjectTypes, this.actToggleAllObjectTypes);
-            this.tbShowAllObjectTypes.AutoToolTip = false;
-            this.tbShowAllObjectTypes.Checked = true;
-            this.tbShowAllObjectTypes.CheckOnClick = true;
-            this.tbShowAllObjectTypes.CheckState = System.Windows.Forms.CheckState.Checked;
-            this.tbShowAllObjectTypes.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image;
-            this.tbShowAllObjectTypes.Enabled = false;
-            this.tbShowAllObjectTypes.Image = global::TabularEditor.Resources.ShowDetails_16x;
-            this.tbShowAllObjectTypes.ImageTransparentColor = System.Drawing.Color.Magenta;
-            this.tbShowAllObjectTypes.Name = "tbShowAllObjectTypes";
-            this.tbShowAllObjectTypes.Size = new System.Drawing.Size(23, 22);
-            this.tbShowAllObjectTypes.Text = "&Show All Object Types";
-            this.tbShowAllObjectTypes.ToolTipText = "Show/hide all object types (perspectives, roles, data sources, etc.) in addition " +
-    "to tables (Ctrl+F3)";
-            // 
             // showAllObjectTypesToolStripMenuItem
             // 
             actionsMain.SetAction(this.showAllObjectTypesToolStripMenuItem, this.actToggleAllObjectTypes);
@@ -1253,22 +1155,6 @@ namespace TabularEditor
             this.showAllObjectTypesToolStripMenuItem.Text = "&Show All Object Types";
             this.showAllObjectTypesToolStripMenuItem.ToolTipText = "Show/hide all object types (perspectives, roles, data sources, etc.) in addition " +
     "to tables (Ctrl+F3)";
-            // 
-            // tbSortAlphabetically
-            // 
-            actionsMain.SetAction(this.tbSortAlphabetically, this.actToggleOrderByName);
-            this.tbSortAlphabetically.AutoToolTip = false;
-            this.tbSortAlphabetically.Checked = true;
-            this.tbSortAlphabetically.CheckOnClick = true;
-            this.tbSortAlphabetically.CheckState = System.Windows.Forms.CheckState.Checked;
-            this.tbSortAlphabetically.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image;
-            this.tbSortAlphabetically.Enabled = false;
-            this.tbSortAlphabetically.Image = global::TabularEditor.Resources.SortAscending_16x;
-            this.tbSortAlphabetically.ImageTransparentColor = System.Drawing.Color.Magenta;
-            this.tbSortAlphabetically.Name = "tbSortAlphabetically";
-            this.tbSortAlphabetically.Size = new System.Drawing.Size(23, 22);
-            this.tbSortAlphabetically.Text = "Sort &alphabetically";
-            this.tbSortAlphabetically.ToolTipText = "Toggle alphabetical/metadata ordering of items (Ctrl+F2)";
             // 
             // sortAlphabeticalToolStripMenuItem
             // 
@@ -1551,36 +1437,6 @@ namespace TabularEditor
             this.goToDefinitionToolStripMenuItem.ToolTipText = "Navigate to the symbol under the cursor. If this is a DAX keyword, opens a browse" +
     "r with the corresponding https://dax.guide article (F12)";
             // 
-            // toolStripButton16
-            // 
-            actionsMain.SetAction(this.toolStripButton16, this.actTogglePartitions);
-            this.toolStripButton16.AutoToolTip = false;
-            this.toolStripButton16.Checked = true;
-            this.toolStripButton16.CheckOnClick = true;
-            this.toolStripButton16.CheckState = System.Windows.Forms.CheckState.Checked;
-            this.toolStripButton16.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image;
-            this.toolStripButton16.Enabled = false;
-            this.toolStripButton16.ImageTransparentColor = System.Drawing.Color.Magenta;
-            this.toolStripButton16.Name = "toolStripButton16";
-            this.toolStripButton16.Size = new System.Drawing.Size(23, 22);
-            this.toolStripButton16.Text = "&Partitions";
-            this.toolStripButton16.ToolTipText = "Show/hide partitions (Ctrl+6)";
-            // 
-            // toolStripButton17
-            // 
-            actionsMain.SetAction(this.toolStripButton17, this.actToggleCalendars);
-            this.toolStripButton17.AutoToolTip = false;
-            this.toolStripButton17.Checked = true;
-            this.toolStripButton17.CheckOnClick = true;
-            this.toolStripButton17.CheckState = System.Windows.Forms.CheckState.Checked;
-            this.toolStripButton17.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image;
-            this.toolStripButton17.Enabled = false;
-            this.toolStripButton17.ImageTransparentColor = System.Drawing.Color.Magenta;
-            this.toolStripButton17.Name = "toolStripButton17";
-            this.toolStripButton17.Size = new System.Drawing.Size(23, 22);
-            this.toolStripButton17.Text = "C&alendars";
-            this.toolStripButton17.ToolTipText = "Show/hide calendars (Ctrl+7)";
-            // 
             // bestPracticeAnalyzerToolStripMenuItem
             // 
             actionsMain.SetAction(this.bestPracticeAnalyzerToolStripMenuItem, this.actOpenBPA);
@@ -1646,12 +1502,6 @@ namespace TabularEditor
             this.btnConnect,
             this.toolStripSeparator3,
             this.btnSave,
-            this.toolStripSeparator22,
-            this.toolStripLabel1,
-            this.cmbPerspective,
-            this.toolStripSeparator5,
-            this.toolStripLabel2,
-            this.cmbTranslation,
             this.btnPropertiesPane});
             this.toolStrip2.Location = new System.Drawing.Point(0, 24);
             this.toolStrip2.Name = "toolStrip2";
@@ -1734,33 +1584,11 @@ namespace TabularEditor
             this.toolStripSeparator3.Name = "toolStripSeparator3";
             this.toolStripSeparator3.Size = new System.Drawing.Size(6, 25);
             // 
-            // toolStripSeparator22
-            // 
-            this.toolStripSeparator22.Name = "toolStripSeparator22";
-            this.toolStripSeparator22.Size = new System.Drawing.Size(6, 25);
-            // 
-            // toolStripLabel1
-            // 
-            this.toolStripLabel1.Name = "toolStripLabel1";
-            this.toolStripLabel1.Size = new System.Drawing.Size(70, 22);
-            this.toolStripLabel1.Text = "Perspective:";
-            // 
             // cmbPerspective
             // 
             this.cmbPerspective.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
             this.cmbPerspective.Name = "cmbPerspective";
             this.cmbPerspective.Size = new System.Drawing.Size(121, 25);
-            // 
-            // toolStripSeparator5
-            // 
-            this.toolStripSeparator5.Name = "toolStripSeparator5";
-            this.toolStripSeparator5.Size = new System.Drawing.Size(6, 25);
-            // 
-            // toolStripLabel2
-            // 
-            this.toolStripLabel2.Name = "toolStripLabel2";
-            this.toolStripLabel2.Size = new System.Drawing.Size(68, 22);
-            this.toolStripLabel2.Text = "Translation:";
             // 
             // cmbTranslation
             // 
@@ -1790,7 +1618,6 @@ namespace TabularEditor
             // splitContainer1.Panel1
             // 
             this.splitContainer1.Panel1.Controls.Add(this.tvModel);
-            this.splitContainer1.Panel1.Controls.Add(this.toolTreeView);
             this.splitContainer1.Panel1.Controls.Add(this.toolModelSearch);
             this.splitContainer1.Panel1.Controls.Add(this.lblModelPane);
             // 
@@ -1940,47 +1767,6 @@ namespace TabularEditor
             this.nodeTextBox7.UseCompatibleTextRendering = true;
             this.nodeTextBox7.VirtualMode = true;
             this.nodeTextBox7.ValueNeeded += new System.EventHandler<Aga.Controls.Tree.NodeControls.NodeControlValueEventArgs>(this.nodeTextBox7_ValueNeeded);
-            // 
-            // toolTreeView
-            // 
-            this.toolTreeView.CanOverflow = true;
-            this.toolTreeView.GripStyle = System.Windows.Forms.ToolStripGripStyle.Hidden;
-            this.toolTreeView.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
-            this.toolStripLabel3,
-            this.tbShowMeasures,
-            this.tbShowColumns,
-            this.tbShowHierarchies,
-            this.toolStripButton16,
-            this.toolStripButton17,
-            this.toolStripSeparator2,
-            this.tbShowDisplayFolders,
-            this.tbShowHidden,
-            this.toolStripSeparator6,
-            this.toolStripButton6,
-            this.tbSortAlphabetically,
-            this.tbShowAllObjectTypes});
-            this.toolTreeView.Location = new System.Drawing.Point(0, 0);
-            this.toolTreeView.Name = "toolTreeView";
-            this.toolTreeView.Size = new System.Drawing.Size(405, 25);
-            this.toolTreeView.Stretch = true;
-            this.toolTreeView.TabIndex = 18;
-            this.toolTreeView.Text = "Tree";
-            this.toolTreeView.ItemClicked += new System.Windows.Forms.ToolStripItemClickedEventHandler(this.toolTreeView_ItemClicked);
-            // 
-            // toolStripLabel3
-            // 
-            this.toolStripLabel3.Name = "toolStripLabel3";
-            this.toolStripLabel3.Size = new System.Drawing.Size(0, 22);
-            // 
-            // toolStripSeparator2
-            // 
-            this.toolStripSeparator2.Name = "toolStripSeparator2";
-            this.toolStripSeparator2.Size = new System.Drawing.Size(6, 25);
-            // 
-            // toolStripSeparator6
-            // 
-            this.toolStripSeparator6.Name = "toolStripSeparator6";
-            this.toolStripSeparator6.Size = new System.Drawing.Size(6, 25);
             // 
             // splitContainer2
             // 
@@ -2221,9 +2007,7 @@ namespace TabularEditor
             this.toolStripButton12,
             this.toolStripSeparator1,
             this.toolStripButton13,
-            this.toolStripButton14,
-            this.toolStripSeparator20,
-            this.toolStripComboBox1});
+            this.toolStripButton14});
             this.toolStrip4.Location = new System.Drawing.Point(3, 3);
             this.toolStrip4.Name = "toolStrip4";
             this.toolStrip4.Size = new System.Drawing.Size(644, 25);
@@ -2285,11 +2069,6 @@ namespace TabularEditor
             // 
             this.toolStripSeparator1.Name = "toolStripSeparator1";
             this.toolStripSeparator1.Size = new System.Drawing.Size(6, 25);
-            // 
-            // toolStripSeparator20
-            // 
-            this.toolStripSeparator20.Name = "toolStripSeparator20";
-            this.toolStripSeparator20.Size = new System.Drawing.Size(6, 25);
             // 
             // toolStripComboBox1
             // 
@@ -2550,6 +2329,8 @@ namespace TabularEditor
             this.mEasToolStripMenuItem,
             this.xToolStripMenuItem,
             this.yToolStripMenuItem,
+            this.partitionsToolStripMenuItem,
+            this.calendarsToolStripMenuItem,
             this.toolStripMenuItem4,
             this.displayFoldersToolStripMenuItem,
             this.hiddenObjectsToolStripMenuItem,
@@ -2759,8 +2540,6 @@ namespace TabularEditor
             this.splitContainer1.Panel2.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)(this.splitContainer1)).EndInit();
             this.splitContainer1.ResumeLayout(false);
-            this.toolTreeView.ResumeLayout(false);
-            this.toolTreeView.PerformLayout();
             this.splitContainer2.Panel1.ResumeLayout(false);
             this.splitContainer2.Panel2.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)(this.splitContainer2)).EndInit();
@@ -2790,10 +2569,7 @@ namespace TabularEditor
         private System.Windows.Forms.ToolStripButton btnSave;
         private System.Windows.Forms.ToolStripSeparator toolStripSeparator3;
         private System.Windows.Forms.ToolStripButton btnConnect;
-        private System.Windows.Forms.ToolStripLabel toolStripLabel1;
         private System.Windows.Forms.ToolStripComboBox cmbPerspective;
-        private System.Windows.Forms.ToolStripSeparator toolStripSeparator5;
-        private System.Windows.Forms.ToolStripLabel toolStripLabel2;
         private System.Windows.Forms.ToolStripComboBox cmbTranslation;
         private System.Windows.Forms.SplitContainer splitContainer1;
         private System.Windows.Forms.ToolStrip toolModelSearch;
@@ -2848,6 +2624,8 @@ namespace TabularEditor
         private System.Windows.Forms.ToolStripMenuItem mEasToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem xToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem yToolStripMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem partitionsToolStripMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem calendarsToolStripMenuItem;
         private System.Windows.Forms.ToolStripSeparator toolStripMenuItem5;
         private System.Windows.Forms.ToolStripMenuItem metadataInformationToolStripMenuItem;
         private TabularEditor.UI.UIModelAction actCollapseAll;
@@ -2881,15 +2659,6 @@ namespace TabularEditor
         private Aga.Controls.Tree.NodeControls.NodeTextBox _formatString;
         private Aga.Controls.Tree.NodeControls.NodeTextBox _dataType;
         private Aga.Controls.Tree.NodeControls.NodeTextBox _description;
-        private System.Windows.Forms.ToolStrip toolTreeView;
-        private System.Windows.Forms.ToolStripButton tbShowDisplayFolders;
-        private System.Windows.Forms.ToolStripButton tbShowHidden;
-        private System.Windows.Forms.ToolStripButton tbShowMeasures;
-        private System.Windows.Forms.ToolStripButton tbShowColumns;
-        private System.Windows.Forms.ToolStripButton tbShowHierarchies;
-        private System.Windows.Forms.ToolStripSeparator toolStripSeparator2;
-        private System.Windows.Forms.ToolStripSeparator toolStripSeparator6;
-        private System.Windows.Forms.ToolStripButton toolStripButton6;
         private UI.Extensions.FCTB.FastColoredTextBox txtExpression;
         private System.Windows.Forms.Label lblCurrentMeasure;
         private System.Windows.Forms.ToolStrip toolStrip3;
@@ -2927,7 +2696,6 @@ namespace TabularEditor
         private TabularEditor.UI.Actions.SelectAllAction actSelectAll;
         private TabularEditor.UI.Actions.CutAction actCut;
         private System.Windows.Forms.ToolStripSeparator toolStripMenuItem3;
-        private System.Windows.Forms.ToolStripButton tbShowAllObjectTypes;
         private System.Windows.Forms.ToolStripMenuItem showAllObjectTypesToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem saveToFolderToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem toolsToolStripMenuItem;
@@ -2935,7 +2703,6 @@ namespace TabularEditor
         private System.Windows.Forms.ToolStripMenuItem bestPracticeAnalyzerToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem recentFilesToolStripMenuItem;
         private System.Windows.Forms.ToolStripSeparator toolStripSeparator12;
-        private System.Windows.Forms.ToolStripButton tbSortAlphabetically;
         private System.Windows.Forms.ToolStripMenuItem sortAlphabeticalToolStripMenuItem;
         private System.Windows.Forms.ToolStripSeparator toolStripSeparator13;
         private System.Windows.Forms.ToolStripButton toolStripButton1;
@@ -2957,12 +2724,10 @@ namespace TabularEditor
         public UI.UIModelAction actToggleHierarchies;
         public UI.UIModelAction actToggleFilter;
         private System.Windows.Forms.ToolStripMenuItem dynamicToolStripMenuItem;
-        private System.Windows.Forms.ToolStripLabel toolStripLabel3;
         private System.Windows.Forms.ToolStripSeparator toolStripSeparator19;
         public UI.UIModelAction actSave;
         private System.Windows.Forms.OpenFileDialog ofdScript;
         private System.Windows.Forms.SaveFileDialog sfdScript;
-        private System.Windows.Forms.ToolStripSeparator toolStripSeparator20;
         private System.Windows.Forms.ToolStripComboBox toolStripComboBox1;
         private System.Windows.Forms.ToolStripSeparator toolStripSeparator21;
         private System.Windows.Forms.ToolStripComboBox cmbExpressionSelector;
@@ -2971,7 +2736,6 @@ namespace TabularEditor
         private Aga.Controls.Tree.NodeControls.NodeTextBox nodeTextBox5;
         private Crad.Windows.Forms.Actions.Action actBack;
         private Crad.Windows.Forms.Actions.Action actForward;
-        private System.Windows.Forms.ToolStripSeparator toolStripSeparator22;
         private System.Windows.Forms.ToolStripButton tbApplyFilter;
         private Aga.Controls.Tree.NodeControls.NodeTextBox nodeTextBox7;
         public Aga.Controls.Tree.TreeColumn _colTable;
@@ -3002,9 +2766,7 @@ namespace TabularEditor
         private System.Windows.Forms.ToolStripButton toolStripButton15;
         private System.Windows.Forms.ToolStripMenuItem goToDefinitionToolStripMenuItem;
         private System.Windows.Forms.ToolStripSeparator toolStripMenuItem11;
-        private System.Windows.Forms.ToolStripButton toolStripButton16;
         public UI.UIModelAction actTogglePartitions;
-        private System.Windows.Forms.ToolStripButton toolStripButton17;
         public UI.UIModelAction actToggleCalendars;
         private System.Windows.Forms.ToolStripStatusLabel lblBpaRules;
         private System.Windows.Forms.ToolStripMenuItem manageBPARulesToolStripMenuItem;

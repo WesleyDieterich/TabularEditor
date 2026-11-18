@@ -155,7 +155,11 @@ namespace TabularEditor.UI
                 else
                     foreach (Control child in control.Controls) Apply(child);
                 if (control is ToolStrip hostedStrip)
+                {
                     foreach (var host in hostedStrip.Items.OfType<ToolStripControlHost>()) Apply(host.Control);
+                    foreach (var item in hostedStrip.Items.OfType<ToolStripDropDownItem>())
+                        if (item.HasDropDownItems) Apply(item.DropDown);
+                }
                 if (control.ContextMenuStrip != null) Apply(control.ContextMenuStrip);
                 if (control is ButtonBase buttonBase)
                 {

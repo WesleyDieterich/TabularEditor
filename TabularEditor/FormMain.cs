@@ -114,7 +114,7 @@ Selected.Hierarchies.ForEach(item => item.TranslatedDisplayFolders.SetAll(item.D
             ArrangeWorkspaceToolbars();
 
             var renderer = new ToolStripProfessionalRenderer(new WorkspaceColors()) { RoundedEdges = false };
-            foreach (var strip in new ToolStrip[] { menuStrip1, toolStrip2, toolModelSearch, toolTreeView, toolStrip3, toolStrip4, toolPropertiesPane, statusStrip1 })
+            foreach (var strip in new ToolStrip[] { menuStrip1, toolStrip2, toolModelSearch, toolStrip3, toolStrip4, toolPropertiesPane, statusStrip1 })
             {
                 strip.Renderer = renderer;
                 strip.Font = workspaceFont;
@@ -142,15 +142,25 @@ Selected.Hierarchies.ForEach(item => item.TranslatedDisplayFolders.SetAll(item.D
         private void ArrangeWorkspaceToolbars()
         {
             GroupCommands(toolModelSearch, "Results", toolStripButton5, toolStripButton4, toolStripButton7);
-            GroupCommands(toolTreeView, "View", tbShowDisplayFolders, tbShowHidden, toolStripButton6,
-                tbSortAlphabetically, tbShowAllObjectTypes);
             GroupCommands(toolStrip3, "Edit", btnFind, btnReplace, toolStripButton1, toolStripButton2);
             GroupCommands(toolStrip4, "Edit", toolStripButton11, toolStripButton12, toolStripButton13, toolStripButton14);
+
+            var zoomMenu = new ToolStripMenuItem("Script zoom");
+            zoomMenu.DropDownItems.Add(toolStripComboBox1);
+            viewToolStripMenuItem.DropDownItems.Insert(1, zoomMenu);
+
+            var perspectiveMenu = new ToolStripMenuItem("Perspective");
+            perspectiveMenu.DropDownItems.Add(cmbPerspective);
+            var translationMenu = new ToolStripMenuItem("Translation");
+            translationMenu.DropDownItems.Add(cmbTranslation);
+            modelToolStripMenuItem.DropDownItems.Insert(0, perspectiveMenu);
+            modelToolStripMenuItem.DropDownItems.Insert(1, translationMenu);
+            modelToolStripMenuItem.DropDownItems.Insert(2, new ToolStripSeparator());
 
             cmbExpressionSelector.Width = (int)Math.Round(148 * DeviceDpi / 96.0);
 
             var gap = Math.Max(2, (int)Math.Round(3 * DeviceDpi / 96.0));
-            foreach (var strip in new[] { toolStrip2, toolTreeView, toolStrip3, toolStrip4 })
+            foreach (var strip in new[] { toolStrip2, toolStrip3, toolStrip4 })
             {
                 strip.Padding = new Padding(2 * gap, gap, 2 * gap, gap);
                 foreach (ToolStripItem item in strip.Items)
@@ -901,12 +911,14 @@ Selected.Hierarchies.ForEach(item => item.TranslatedDisplayFolders.SetAll(item.D
         public void UpdateTreeUIButtons()
         {
             var treeModel = tvModel.Model as TabularUITree;
-            tbShowDisplayFolders.Checked = treeModel.Options.HasFlag(TOMWrapper.LogicalTreeOptions.DisplayFolders);
-            tbShowHidden.Checked = treeModel.Options.HasFlag(TOMWrapper.LogicalTreeOptions.ShowHidden);
-            tbShowAllObjectTypes.Checked = treeModel.Options.HasFlag(TOMWrapper.LogicalTreeOptions.AllObjectTypes);
-            tbShowMeasures.Checked = treeModel.Options.HasFlag(TOMWrapper.LogicalTreeOptions.Measures);
-            tbShowColumns.Checked = treeModel.Options.HasFlag(TOMWrapper.LogicalTreeOptions.Columns);
-            tbShowHierarchies.Checked = treeModel.Options.HasFlag(TOMWrapper.LogicalTreeOptions.Hierarchies);
+            displayFoldersToolStripMenuItem.Checked = treeModel.Options.HasFlag(TOMWrapper.LogicalTreeOptions.DisplayFolders);
+            hiddenObjectsToolStripMenuItem.Checked = treeModel.Options.HasFlag(TOMWrapper.LogicalTreeOptions.ShowHidden);
+            showAllObjectTypesToolStripMenuItem.Checked = treeModel.Options.HasFlag(TOMWrapper.LogicalTreeOptions.AllObjectTypes);
+            mEasToolStripMenuItem.Checked = treeModel.Options.HasFlag(TOMWrapper.LogicalTreeOptions.Measures);
+            xToolStripMenuItem.Checked = treeModel.Options.HasFlag(TOMWrapper.LogicalTreeOptions.Columns);
+            yToolStripMenuItem.Checked = treeModel.Options.HasFlag(TOMWrapper.LogicalTreeOptions.Hierarchies);
+            partitionsToolStripMenuItem.Checked = treeModel.Options.HasFlag(TOMWrapper.LogicalTreeOptions.Partitions);
+            calendarsToolStripMenuItem.Checked = treeModel.Options.HasFlag(TOMWrapper.LogicalTreeOptions.Calendars);
             tbApplyFilter.Checked = !string.IsNullOrEmpty(treeModel.Filter);
         }
 
@@ -949,11 +961,6 @@ Selected.Hierarchies.ForEach(item => item.TranslatedDisplayFolders.SetAll(item.D
         private void actNewModel_Execute(object sender, EventArgs e)
         {
             UI.File_New();
-        }
-
-        private void toolTreeView_ItemClicked(object sender, ToolStripItemClickedEventArgs e)
-        {
-
         }
 
         private void btnOpenScript_Click(object sender, EventArgs e)
