@@ -644,10 +644,9 @@ namespace TabularEditor
             // actComment
             // 
             this.actComment.Image = global::TabularEditor.Resources.CommentCode_16x;
-            this.actComment.ShortcutKeys = ((System.Windows.Forms.Keys)(((System.Windows.Forms.Keys.Control | System.Windows.Forms.Keys.Shift) 
-            | System.Windows.Forms.Keys.C)));
+            this.actComment.ShortcutKeys = System.Windows.Forms.Keys.Control | System.Windows.Forms.Keys.OemSemicolon;
             this.actComment.Text = "Comment lines";
-            this.actComment.ToolTipText = "Comment the selected lines (Ctrl+Shift+C)";
+            this.actComment.ToolTipText = "Comment the selected lines (Ctrl+;)";
             this.actComment.Execute += new System.EventHandler(this.actComment_Execute);
             this.actComment.Update += new System.EventHandler(this.CanComment);
             // 
@@ -1181,7 +1180,7 @@ namespace TabularEditor
             this.toolStripButton1.Name = "toolStripButton1";
             this.toolStripButton1.Size = new System.Drawing.Size(23, 22);
             this.toolStripButton1.Text = "Comment lines";
-            this.toolStripButton1.ToolTipText = "Comment the selected lines (Ctrl+Shift+C)";
+            this.toolStripButton1.ToolTipText = "Comment the selected lines (Ctrl+;)";
             // 
             // toolStripButton2
             // 
@@ -1275,12 +1274,11 @@ namespace TabularEditor
             actionsMain.SetAction(this.commentToolStripMenuItem, this.actComment);
             this.commentToolStripMenuItem.Image = global::TabularEditor.Resources.CommentCode_16x;
             this.commentToolStripMenuItem.Name = "commentToolStripMenuItem";
-            this.commentToolStripMenuItem.ShortcutKeyDisplayString = "Ctrl+Shift+C";
-            this.commentToolStripMenuItem.ShortcutKeys = ((System.Windows.Forms.Keys)(((System.Windows.Forms.Keys.Control | System.Windows.Forms.Keys.Shift) 
-            | System.Windows.Forms.Keys.C)));
+            this.commentToolStripMenuItem.ShortcutKeyDisplayString = "Ctrl+;";
+            this.commentToolStripMenuItem.ShortcutKeys = System.Windows.Forms.Keys.Control | System.Windows.Forms.Keys.OemSemicolon;
             this.commentToolStripMenuItem.Size = new System.Drawing.Size(245, 22);
             this.commentToolStripMenuItem.Text = "Comment lines";
-            this.commentToolStripMenuItem.ToolTipText = "Comment the selected lines (Ctrl+Shift+C)";
+            this.commentToolStripMenuItem.ToolTipText = "Comment the selected lines (Ctrl+;)";
             // 
             // uncommentToolStripMenuItem
             // 
@@ -1398,7 +1396,7 @@ namespace TabularEditor
             this.toolStripButton13.Name = "toolStripButton13";
             this.toolStripButton13.Size = new System.Drawing.Size(23, 22);
             this.toolStripButton13.Text = "Comment lines";
-            this.toolStripButton13.ToolTipText = "Comment the selected lines (Ctrl+Shift+C)";
+            this.toolStripButton13.ToolTipText = "Comment the selected lines (Ctrl+;)";
             // 
             // toolStripButton14
             // 

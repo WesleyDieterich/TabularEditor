@@ -15,6 +15,11 @@ namespace TabularEditor.UI
         private readonly FastColoredTextBox editor;
         private readonly Func<bool> isDax;
         private readonly Func<Model> getModel;
+        private readonly bool queryEditor;
+        private static readonly string[] QueryKeywords =
+        {
+            "DEFINE", "EVALUATE", "MEASURE", "ORDER BY", "START AT", "ASC", "DESC", "VAR", "RETURN"
+        };
         private readonly AutocompleteMenu completion;
         private readonly ToolTip parameterTip = new ToolTip();
         private bool manualCompletion;
@@ -22,11 +27,12 @@ namespace TabularEditor.UI
 
         private bool IsActive => editor.Enabled && editor.Visible && editor.Focused && !editor.ReadOnly && isDax();
 
-        public DaxIntelliSense(FastColoredTextBox editor, Func<bool> isDax, Func<Model> getModel)
+        public DaxIntelliSense(FastColoredTextBox editor, Func<bool> isDax, Func<Model> getModel, bool queryEditor = false)
         {
             this.editor = editor;
             this.isDax = isDax;
             this.getModel = getModel;
+            this.queryEditor = queryEditor;
 
             editor.KeyDown += HandleEditorKeyDown;
             completion = new AutocompleteMenu(editor)
@@ -202,6 +208,10 @@ namespace TabularEditor.UI
 
             if (context.ReferenceDelimiter == '\0')
             {
+                if (queryEditor)
+                    foreach (var keyword in QueryKeywords.Where(keyword => Matches(keyword, context.Prefix)))
+                        yield return new CompletionItem(keyword, keyword, "DAX query keyword", string.Empty);
+
                 foreach (var function in DaxFunctionCatalog.Functions.Value)
                 {
                     if (Matches(function.Key, context.Prefix))

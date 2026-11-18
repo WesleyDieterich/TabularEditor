@@ -300,6 +300,8 @@
     <Compile Include="TextServices\DaxFunctionCatalog.cs" />
     <Compile Include="TextServices\ExpressionParser.cs" />
     <Compile Include="UI\DaxIntelliSense.cs" />
+    <Compile Include="UI\DaxQueryEditor.cs" />
+    <Compile Include="UI\DaxQueryWorkbook.cs" />
     <Compile Include="UI\AppTheme.cs" />
     <Compile Include="UI\DarkScrollBar.cs" />
     <Compile Include="UI\DarkSelectorChrome.cs" />

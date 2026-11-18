@@ -21,6 +21,8 @@ namespace TabularEditor
         public UIController UI;
 
         private MacroJson CurrentMacro;
+        private DaxQueryEditor daxQueryEditor;
+        private TabPage pgDaxScript;
 
         public static FormMain Singleton;
 
@@ -38,6 +40,11 @@ namespace TabularEditor
             propertyGrid1.Site = new DesignerHost();
 
             SetupUIController();
+            daxQueryEditor = new DaxQueryEditor(() => UI.Handler);
+            pgDaxScript = new TabPage("DAX Script");
+            pgDaxScript.Controls.Add(daxQueryEditor);
+            tabCodeEditors.TabPages.Add(pgDaxScript);
+            UI.ModelLoaded += (sender, args) => daxQueryEditor.ClearResults();
             txtFilter.Control.SetCueBanner("Search model");
 
             ///// Populate macros and samples /////
@@ -99,6 +106,7 @@ Selected.Hierarchies.ForEach(item => item.TranslatedDisplayFolders.SetAll(item.D
         {
             AppTheme.Apply(this);
             UI.ApplyEditorTheme();
+            daxQueryEditor.ApplyTheme();
         }
 
         private void StyleWorkspace()
@@ -611,6 +619,11 @@ Selected.Hierarchies.ForEach(item => item.TranslatedDisplayFolders.SetAll(item.D
 
         private void actFind_Execute(object sender, EventArgs e)
         {
+            if (tabCodeEditors.SelectedTab == pgDaxScript)
+            {
+                daxQueryEditor.Find();
+                return;
+            }
             switch (tabCodeEditors.SelectedIndex)
             {
                 case 0:
@@ -624,6 +637,11 @@ Selected.Hierarchies.ForEach(item => item.TranslatedDisplayFolders.SetAll(item.D
 
         private void actReplace_Execute(object sender, EventArgs e)
         {
+            if (tabCodeEditors.SelectedTab == pgDaxScript)
+            {
+                daxQueryEditor.Replace();
+                return;
+            }
             switch (tabCodeEditors.SelectedIndex) {
                 case 0:
                     UI.ExpressionEditor_BeginEdit();
@@ -938,19 +956,22 @@ Selected.Hierarchies.ForEach(item => item.TranslatedDisplayFolders.SetAll(item.D
         {
             (sender as Crad.Windows.Forms.Actions.Action).Enabled = 
                 (txtExpression.Focused && txtExpression.Text != "") ||
-                (txtAdvanced.Focused && txtAdvanced.Text != "");
+                (txtAdvanced.Focused && txtAdvanced.Text != "") ||
+                daxQueryEditor?.CanComment == true;
         }
 
         private void actComment_Execute(object sender, EventArgs e)
         {
             if (txtExpression.Focused) txtExpression.InsertLinePrefix("//");
             if (txtAdvanced.Focused) txtAdvanced.InsertLinePrefix("//");
+            if (daxQueryEditor?.CanComment == true) daxQueryEditor.Comment();
         }
 
         private void actUncomment_Execute(object sender, EventArgs e)
         {
             if (txtExpression.Focused) txtExpression.RemoveLinePrefix("//");
             if (txtAdvanced.Focused) txtAdvanced.RemoveLinePrefix("//");
+            if (daxQueryEditor?.CanComment == true) daxQueryEditor.Uncomment();
         }
 
         private void actSaveToFolder_Execute(object sender, EventArgs e)
@@ -1049,6 +1070,12 @@ Selected.Hierarchies.ForEach(item => item.TranslatedDisplayFolders.SetAll(item.D
 
         protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
         {
+            if (keyData == Keys.F5 && tabCodeEditors.SelectedTab == pgDaxScript)
+            {
+                daxQueryEditor.Execute();
+                return true;
+            }
+
             // Global keyboard shortcuts (if this method returns TRUE, then the key press will not be propagated to form controls)
             switch (keyData)
             {
@@ -1086,6 +1113,7 @@ Selected.Hierarchies.ForEach(item => item.TranslatedDisplayFolders.SetAll(item.D
         {
             e.Enabled = (txtExpression.ContainsFocus && UI.ExpressionEditor_Current != null) 
                 || txtAdvanced.ContainsFocus 
+                || daxQueryEditor?.EditorContainsFocus == true
                 || propertyGrid1.ContainsFocus;
         }
 
