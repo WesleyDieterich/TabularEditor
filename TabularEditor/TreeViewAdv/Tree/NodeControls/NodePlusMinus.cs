@@ -51,7 +51,16 @@ namespace Aga.Controls.Tree.NodeControls
 			{
 				Rectangle r = context.Bounds;
 				int dy = (int)Math.Round((float)(r.Height - ImageSize) / 2);
-				if (Application.RenderWithVisualStyles)
+				if (TabularEditor.UI.AppTheme.IsDark)
+				{
+					int x = r.X + 2;
+					int y = r.Y + dy + 2;
+					var points = node.IsExpanded
+						? new[] { new Point(x, y + 1), new Point(x + 3, y + 4), new Point(x + 6, y + 1) }
+						: new[] { new Point(x + 1, y), new Point(x + 4, y + 3), new Point(x + 1, y + 6) };
+					context.Graphics.DrawLines(TabularEditor.UI.AppTheme.AccentPen, points);
+				}
+				else if (Application.RenderWithVisualStyles)
 				{
 					VisualStyleRenderer renderer;
 					if (node.IsExpanded)

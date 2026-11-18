@@ -145,19 +145,20 @@ namespace Aga.Controls.Tree
 					Rectangle focusRect = new Rectangle(OffsetX, rowRect.Y, ClientRectangle.Width, rowRect.Height);
 					if (context.DrawSelection == DrawSelectionMode.Active)
 					{
-						e.Graphics.FillRectangle(SystemBrushes.Highlight, focusRect);
+						e.Graphics.FillRectangle(TabularEditor.UI.AppTheme.IsDark ? TabularEditor.UI.AppTheme.SelectionBrush : SystemBrushes.Highlight, focusRect);
 						context.DrawSelection = DrawSelectionMode.FullRowSelect;
 					}
 					else
 					{
-						e.Graphics.FillRectangle(SystemBrushes.InactiveBorder, focusRect);
+						e.Graphics.FillRectangle(TabularEditor.UI.AppTheme.IsDark ? TabularEditor.UI.AppTheme.RaisedBrush : SystemBrushes.InactiveBorder, focusRect);
 						context.DrawSelection = DrawSelectionMode.None;
 					}
 				}
 			}
 
             if ((GridLineStyle & GridLineStyle.Horizontal) == GridLineStyle.Horizontal)
-				e.Graphics.DrawLine(SystemPens.InactiveBorder, 0, rowRect.Bottom, e.Graphics.ClipBounds.Right, rowRect.Bottom);
+				e.Graphics.DrawLine(TabularEditor.UI.AppTheme.IsDark ? TabularEditor.UI.AppTheme.BorderPen : SystemPens.InactiveBorder,
+					0, rowRect.Bottom, e.Graphics.ClipBounds.Right, rowRect.Bottom);
 
 			if (ShowLines)
 				DrawLines(e.Graphics, node, rowRect);
@@ -173,7 +174,8 @@ namespace Aga.Controls.Tree
 				if (c.IsVisible)
 				{
 					x += c.Width;
-					gr.DrawLine(SystemPens.InactiveBorder, x - 1, y, x - 1, gr.ClipBounds.Bottom);
+					gr.DrawLine(TabularEditor.UI.AppTheme.IsDark ? TabularEditor.UI.AppTheme.BorderPen : SystemPens.InactiveBorder,
+						x - 1, y, x - 1, gr.ClipBounds.Bottom);
 				}
 			}
 		}
@@ -231,7 +233,7 @@ namespace Aga.Controls.Tree
 		{
 			Rectangle r1 = DisplayRectangle;
 			Rectangle r2 = ClientRectangle;
-			gr.FillRectangle(SystemBrushes.Control,
+			gr.FillRectangle(TabularEditor.UI.AppTheme.IsDark ? TabularEditor.UI.AppTheme.RaisedBrush : SystemBrushes.Control,
 				new Rectangle(r1.Right, r1.Bottom, r2.Width - r1.Width, r2.Height - r1.Height));
 		}
 

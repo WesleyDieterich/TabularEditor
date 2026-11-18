@@ -284,10 +284,11 @@ namespace Aga.Controls.Tree
                 DrawSortMark(gr, bounds, x);
 			}
 
+			var textColor = TabularEditor.UI.AppTheme.IsDark ? TabularEditor.UI.AppTheme.Text : SystemColors.ControlText;
 			if (textSize.Width < maxTextSize.Width)
-				TextRenderer.DrawText(gr, Header, font, innerBounds, SystemColors.ControlText, _baseHeaderFlags | TextFormatFlags.Left);
+				TextRenderer.DrawText(gr, Header, font, innerBounds, textColor, _baseHeaderFlags | TextFormatFlags.Left);
             else
-				TextRenderer.DrawText(gr, Header, font, innerBounds, SystemColors.ControlText, _headerFlags);
+				TextRenderer.DrawText(gr, Header, font, innerBounds, textColor, _headerFlags);
         }
 
 		private void DrawSortMark(Graphics gr, Rectangle bounds, int x)
@@ -315,6 +316,11 @@ namespace Aga.Controls.Tree
 
 		internal static void DrawBackground(Graphics gr, Rectangle bounds, bool pressed, bool hot)
 		{
+			if (TabularEditor.UI.AppTheme.IsDark)
+			{
+				gr.FillRectangle(pressed || hot ? TabularEditor.UI.AppTheme.SelectionBrush : TabularEditor.UI.AppTheme.RaisedBrush, bounds);
+				return;
+			}
 			if (Application.RenderWithVisualStyles)
 			{
 				CreateRenderers();

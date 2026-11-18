@@ -24,6 +24,7 @@ namespace TabularEditor.UI.Dialogs
             databasePage1.EnableColumnFilters();
             databasePage1.ModelListChanged += (sender, args) => UpdateModelCount();
             UpdateModelCount();
+            AppTheme.Apply(this);
         }
 
         private void UpdateModelCount()

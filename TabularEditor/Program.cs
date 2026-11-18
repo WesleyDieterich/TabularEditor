@@ -60,6 +60,7 @@ namespace TabularEditor
             {
                 Application.EnableVisualStyles();
                 Application.SetCompatibleTextRenderingDefault(false);
+                Application.Idle += UI.AppTheme.ApplyOpenForms;
                 Application.Run(new FormMain());
             }
             TabularModelHandler.Cleanup();

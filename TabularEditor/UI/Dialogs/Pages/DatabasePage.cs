@@ -42,7 +42,7 @@ namespace TabularEditor.UI.Dialogs.Pages
             grid.ColumnHeadersDefaultCellStyle.ForeColor = SystemColors.WindowText;
             grid.DefaultCellStyle.Padding = new Padding(7, 0, 7, 0);
             grid.ColumnHeadersDefaultCellStyle.Padding = new Padding(7, 0, 7, 0);
-            DatabaseIcon.DefaultCellStyle.Padding = Padding.Empty;
+            DatabaseIcon.Visible = false;
 
             if (!SystemInformation.HighContrast)
             {
@@ -57,8 +57,7 @@ namespace TabularEditor.UI.Dialogs.Pages
 
             var scale = DeviceDpi / 96.0;
             grid.RowTemplate.Height = Math.Max(grid.Font.Height + 10, (int)Math.Round(28 * scale));
-            DatabaseIcon.Width = (int)Math.Round(26 * scale);
-            colName.Width = (int)Math.Round(238 * scale);
+            colName.Width = (int)Math.Round(264 * scale);
             CompatibilityLevel.Width = (int)Math.Round(116 * scale);
             colLastUpdate.Width = (int)Math.Round(147 * scale);
             colDescription.Width = (int)Math.Round(182 * scale);
@@ -94,43 +93,42 @@ namespace TabularEditor.UI.Dialogs.Pages
             var inset = dataGridView1.DefaultCellStyle.Padding.Left;
             filterPanel.Paint += (sender, args) =>
             {
-                var bottom = filterPanel.ClientSize.Height - 1;
-                var right = filterPanel.ClientSize.Width - 1;
-                args.Graphics.DrawLine(SystemPens.ControlLight, 0, 0, right, 0);
-                args.Graphics.DrawLine(SystemPens.ControlLight, 0, bottom, right, bottom);
-                args.Graphics.DrawLine(SystemPens.ControlLight, DatabaseIcon.Width - 1, 0, DatabaseIcon.Width - 1, bottom);
+                args.Graphics.Clear(dataGridView1.ColumnHeadersDefaultCellStyle.BackColor);
+                var border = AppTheme.IsDark ? AppTheme.BorderPen : SystemPens.ControlLight;
                 foreach (var filter in columnFilters.Values)
                 {
                     if (!filter.Visible) continue;
 
-                    var columnRight = filter.Right + inset - 1;
-                    args.Graphics.DrawLine(SystemPens.ControlLight, columnRight, 0, columnRight, bottom);
-                    if (filter.Focused)
-                        args.Graphics.DrawRectangle(SystemPens.Highlight, filter.Left - inset, 0, filter.Width + 2 * inset - 1, bottom);
+                    var field = Rectangle.Inflate(filter.Bounds, 4, 2);
+                    using (var background = new SolidBrush(filter.BackColor))
+                        args.Graphics.FillRectangle(background, field);
+                    var outline = filter.Focused
+                        ? AppTheme.IsDark ? AppTheme.AccentPen : SystemPens.Highlight
+                        : border;
+                    args.Graphics.DrawRectangle(outline, field.X, field.Y, field.Width - 1, field.Height - 1);
                 }
             };
 
             void LayoutColumnFilters()
             {
-                var filterHeight = columnFilters[colName].PreferredHeight + 8;
+                if (IsDisposed || Disposing || dataGridView1.IsDisposed || dataGridView1.Disposing) return;
+
+                var filterHeight = columnFilters[colName].PreferredHeight + 11;
                 var headerStyle = dataGridView1.ColumnHeadersDefaultCellStyle;
                 headerStyle.Padding = new Padding(inset, 0, inset, filterHeight);
-                dataGridView1.ColumnHeadersHeight = (headerStyle.Font ?? dataGridView1.Font).Height + 13 + filterHeight;
+                dataGridView1.ColumnHeadersHeight = (headerStyle.Font ?? dataGridView1.Font).Height + 9 + filterHeight;
 
-                var iconHeader = dataGridView1.GetCellDisplayRectangle(DatabaseIcon.Index, -1, true);
-                if (iconHeader.IsEmpty) return;
-
-                var right = verticalScrollBar?.Visible == true ? verticalScrollBar.Left : dataGridView1.ClientSize.Width - iconHeader.Left;
-                filterPanel.SetBounds(iconHeader.Left, iconHeader.Bottom - filterHeight,
-                    Math.Max(0, right - iconHeader.Left), filterHeight);
+                var right = verticalScrollBar?.Visible == true ? verticalScrollBar.Left : dataGridView1.ClientSize.Width;
+                filterPanel.SetBounds(0, dataGridView1.ColumnHeadersHeight - filterHeight,
+                    Math.Max(0, right), filterHeight);
                 foreach (var entry in columnFilters)
                 {
                     var bounds = dataGridView1.GetColumnDisplayRectangle(entry.Key.Index, true);
-                    var left = Math.Max(bounds.Left, iconHeader.Right);
+                    var left = Math.Max(bounds.Left, 0);
                     var width = Math.Min(bounds.Right, filterPanel.Right) - left;
                     entry.Value.Visible = width > 2 * inset;
                     if (width > 2 * inset)
-                        entry.Value.SetBounds(left - filterPanel.Left + inset, 4, width - 2 * inset, entry.Value.PreferredHeight);
+                        entry.Value.SetBounds(left + inset, 4, width - 2 * inset, entry.Value.PreferredHeight);
                 }
                 filterPanel.Invalidate();
             }
@@ -177,7 +175,7 @@ namespace TabularEditor.UI.Dialogs.Pages
 
             suspendSelectionChanged = true;
             dataGridView1.DataSource = list;
-            dataGridView1.CurrentCell = index >= 0 ? dataGridView1.Rows[index].Cells[0] : null;
+            dataGridView1.CurrentCell = index >= 0 ? dataGridView1.Rows[index].Cells[colName.Index] : null;
             dataGridView1.ClearSelection();
             if (index >= 0) dataGridView1.Rows[index].Selected = true;
             txtDatabaseName.Text = index >= 0 ? selected.Name : "";
@@ -224,7 +222,7 @@ namespace TabularEditor.UI.Dialogs.Pages
                 var index = databaseList.FirstIndexOf(db => db.Name == PreselectDb);
                 if (index >= 0)
                 {
-                    dataGridView1.CurrentCell = dataGridView1.Rows[index].Cells[0];
+                    dataGridView1.CurrentCell = dataGridView1.Rows[index].Cells[colName.Index];
                     txtDatabaseName.Text = (dataGridView1.SelectedRows[0].DataBoundItem as DatabaseInfo).Name;
                 }
                 else
@@ -352,7 +350,7 @@ namespace TabularEditor.UI.Dialogs.Pages
                         {
                             row.Selected = false;
                         }
-                        dataGridView1.Rows[i % dataGridView1.Rows.Count].Cells[0].Selected = true;
+                        dataGridView1.Rows[i % dataGridView1.Rows.Count].Selected = true;
                         return; // stop looping
                     }
                 }

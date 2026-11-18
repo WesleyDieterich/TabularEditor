@@ -19,9 +19,21 @@ namespace TabularEditor.UI.Dialogs
 {
     public partial class PreferencesForm : Form
     {
+        private readonly CheckBox chkDarkTheme;
+
         public PreferencesForm()
         {
             InitializeComponent();
+            chkDarkTheme = new CheckBox
+            {
+                AutoSize = true,
+                Text = "Use dark theme",
+                Location = new System.Drawing.Point(16, 16),
+                TabIndex = 0
+            };
+            var appearance = new TabPage("Appearance") { Name = "tabAppearance" };
+            appearance.Controls.Add(chkDarkTheme);
+            tabControl1.TabPages.Add(appearance);
             chkCopyIncludeOLS.Enabled = true;
             cmbSerializationMode.SelectionChangeCommitted += CmbSerializationMode_SelectionChangeCommitted;
             cmbIndentMode.SelectionChangeCommitted += CmbIndentMode_SelectionChangeCommitted;
@@ -93,6 +105,7 @@ namespace TabularEditor.UI.Dialogs
             Handler = handler;
 
             LoadSettings();
+            AppTheme.Apply(this);
 
             var showCm = handler != null && (handler.HasSerializeOptions || !handler.IsConnected);
             SetCurrentModelTabVisible(showCm);
@@ -225,6 +238,7 @@ namespace TabularEditor.UI.Dialogs
 
         private void SaveSettings()
         {
+            Preferences.Current.UseDarkTheme = chkDarkTheme.Checked;
             Preferences.Current.BackupLocation = chkAutoBackup.Checked ? txtBackupPath.Text : string.Empty;
             Preferences.Current.CheckForUpdates = chkAutoUpdate.Checked;
             Preferences.Current.SkipPatchUpdates = chkSkipPatch.Checked;
@@ -318,6 +332,7 @@ namespace TabularEditor.UI.Dialogs
 
         private void LoadSettings()
         {
+            chkDarkTheme.Checked = Preferences.Current.UseDarkTheme;
             if (UpdateService.AvailableVersion.UpdateAvailable())
             {
                 btnVersionCheck.Visible = false;

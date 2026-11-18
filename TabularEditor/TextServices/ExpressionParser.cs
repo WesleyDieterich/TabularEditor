@@ -64,6 +64,15 @@ namespace TabularEditor.TextServices
         public static Style LiteralStyle = new TextStyle(FromHex("#EE7F18"), null, FontStyle.Regular);
         public static Style ParensStyle = new TextStyle(Brushes.Gray, null, FontStyle.Regular);
 
+        internal static void ApplyTheme()
+        {
+            AppTheme.ApplySyntaxColor(PlainStyle, AppTheme.CodeText);
+            AppTheme.ApplySyntaxColor(KeywordStyle, AppTheme.CodeKeyword);
+            AppTheme.ApplySyntaxColor(CommentStyle, AppTheme.CodeComment);
+            AppTheme.ApplySyntaxColor(LiteralStyle, AppTheme.CodeLiteral);
+            AppTheme.ApplySyntaxColor(ParensStyle, AppTheme.CodePunctuation);
+        }
+
         class SearchToken : IToken
         {
             public SearchToken(int charIndex)

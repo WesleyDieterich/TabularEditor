@@ -118,7 +118,7 @@ namespace TabularEditor.UI.Dialogs
             this.cmbCasingStyle = new System.Windows.Forms.ComboBox();
             this.cmbExpressionTrimStyle = new System.Windows.Forms.ComboBox();
             this.groupBox3 = new System.Windows.Forms.GroupBox();
-            this.tabControl1 = new System.Windows.Forms.TabControl();
+            this.tabControl1 = new TabularEditor.UI.ThemedTabControl();
             this.tabFeatures = new System.Windows.Forms.TabPage();
             this.grpDeployment = new System.Windows.Forms.GroupBox();
             this.btnFolder = new System.Windows.Forms.Button();

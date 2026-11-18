@@ -52,6 +52,12 @@ namespace TabularEditor.UI.Tree
             // Key columns should be rendered using a bold font:
             if (e.Node.Tag is Column c && c.IsKey == true) e.Font = BoldFont;
 
+            if (AppTheme.IsDark)
+            {
+                e.TextColor = toneDown ? AppTheme.Muted : toneBlue ? AppTheme.Accent : AppTheme.Text;
+                return;
+            }
+
             e.TextColor =
                 toneSelect ?
                     (toneBlue ?

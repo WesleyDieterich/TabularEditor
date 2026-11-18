@@ -63,14 +63,19 @@ namespace TabularEditor.UI
             HideHelp();
         }
 
+        internal void ApplyTheme()
+        {
+            Close();
+            AppTheme.ApplyAutocomplete(completion, Color.Orange, Color.Red);
+            AppTheme.ApplyToolTip(parameterTip);
+            AppTheme.ApplyToolTip(editor.ToolTip);
+        }
+
         private void HandleEditorKeyDown(object sender, KeyEventArgs args)
         {
             manualCompletion = editor.HotkeysMapping.TryGetValue(args.KeyData, out var action)
                 && action == FCTBAction.AutocompleteMenu;
 
-            // Let Enter reach the editor's line-break handler inside a call. Tab accepts a suggestion there.
-            if (args.KeyData == Keys.Enter && completion.Visible && completionContext?.OpenGroup != null)
-                completion.Close();
         }
 
         private void HideHelp()

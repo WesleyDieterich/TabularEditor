@@ -34,6 +34,7 @@ namespace TabularEditor.UI.Dialogs
                 font.Dispose();
             };
             RefreshFavorites();
+            AppTheme.Apply(this);
         }
 
         private List<ConnectionFavorite> SavedFavorites =>
@@ -83,13 +84,15 @@ namespace TabularEditor.UI.Dialogs
 
         private void DrawFavorite(object sender, DrawItemEventArgs e)
         {
+            var selected = (e.State & DrawItemState.Selected) != 0;
             e.DrawBackground();
+            if (AppTheme.IsDark && selected) e.Graphics.FillRectangle(AppTheme.SelectionBrush, e.Bounds);
             if (e.Index < 0) return;
 
             var item = (ConnectionFavorite)favorites.Items[e.Index];
             var bounds = e.Bounds;
             bounds.Inflate(-8, 0);
-            TextRenderer.DrawText(e.Graphics, FavoriteName(item), e.Font, bounds, e.ForeColor,
+            TextRenderer.DrawText(e.Graphics, FavoriteName(item), e.Font, bounds, AppTheme.IsDark ? AppTheme.Text : e.ForeColor,
                 TextFormatFlags.SingleLine | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
             e.DrawFocusRectangle();
         }

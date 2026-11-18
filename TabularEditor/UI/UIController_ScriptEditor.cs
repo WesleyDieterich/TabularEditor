@@ -22,6 +22,20 @@ namespace TabularEditor.UI
     {
         AutocompleteMenu popupMenu;
 
+        private void ApplyScriptEditorTheme()
+        {
+            var syntax = UI.ScriptEditor.SyntaxHighlighter;
+            AppTheme.ApplySyntaxColor(syntax.KeywordStyle, AppTheme.CodeKeyword);
+            AppTheme.ApplySyntaxColor(syntax.CommentStyle, AppTheme.CodeComment);
+            AppTheme.ApplySyntaxColor(syntax.CommentTagStyle, AppTheme.CodeComment);
+            AppTheme.ApplySyntaxColor(syntax.StringStyle, AppTheme.CodeLiteral);
+            AppTheme.ApplySyntaxColor(syntax.NumberStyle, AppTheme.CodeLiteral);
+            AppTheme.ApplySyntaxColor(syntax.ClassNameStyle, AppTheme.CodeType);
+            AppTheme.ApplySyntaxColor(syntax.AttributeStyle, AppTheme.CodeType);
+            AppTheme.ApplyAutocomplete(popupMenu, System.Drawing.Color.Orange, System.Drawing.Color.Red);
+            AppTheme.ApplyToolTip(UI.ScriptEditor.ToolTip);
+        }
+
         private int WAVY_STYLE;
         private bool scriptEditorErrorsVisible;
 

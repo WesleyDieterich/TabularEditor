@@ -92,6 +92,13 @@ Selected.Hierarchies.ForEach(item => item.TranslatedDisplayFolders[Selected.Cult
 Selected.Columns.ForEach(item => item.TranslatedDisplayFolders.SetAll(item.DisplayFolder));
 Selected.Hierarchies.ForEach(item => item.TranslatedDisplayFolders.SetAll(item.DisplayFolder));");
             });
+            ApplyWorkspaceTheme();
+        }
+
+        private void ApplyWorkspaceTheme()
+        {
+            AppTheme.Apply(this);
+            UI.ApplyEditorTheme();
         }
 
         private void StyleWorkspace()
@@ -748,7 +755,13 @@ Selected.Hierarchies.ForEach(item => item.TranslatedDisplayFolders.SetAll(item.D
         private void preferencesToolStripMenuItem_Click(object sender, EventArgs e)
         {
             var usingSemicolons = Preferences.Current.UseSemicolonsAsSeparators;
+            var usingDarkTheme = Preferences.Current.UseDarkTheme;
             PreferencesForm.Show(UI.Handler);
+            if (usingDarkTheme != Preferences.Current.UseDarkTheme)
+            {
+                ApplyWorkspaceTheme();
+                AppTheme.ApplyOpenForms(this, EventArgs.Empty);
+            }
             if (!Preferences.Current.BackgroundBpa)
                 lblBpaRules.Text = "";
             else

@@ -58,6 +58,15 @@ namespace TabularEditor.UI
         public bool ExpressionEditor_IsEditing { get; private set; } = false;
         private DaxIntelliSense daxIntelliSense;
 
+        internal void ApplyEditorTheme()
+        {
+            ExpressionParser.ApplyTheme();
+            daxIntelliSense.ApplyTheme();
+            ApplyScriptEditorTheme();
+            UI.ExpressionEditor.Invalidate();
+            UI.ScriptEditor.Invalidate();
+        }
+
         private void ExpressionEditor_Init()
         {
             UI.ExpressionEditor.TextChanged += ExpressionEditor_TextChanged;
