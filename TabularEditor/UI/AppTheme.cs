@@ -351,6 +351,19 @@ namespace TabularEditor.UI
 
             public DarkRenderer() : base(new DarkColors()) { RoundedEdges = false; }
 
+            protected override void OnRenderToolStripBorder(ToolStripRenderEventArgs e)
+            {
+                if (e.ToolStrip is StatusStrip)
+                {
+                    var bounds = e.AffectedBounds;
+                    using (var pen = new Pen(Border))
+                        e.Graphics.DrawLine(pen, bounds.Left, bounds.Top, bounds.Right - 1, bounds.Top);
+                    return;
+                }
+
+                base.OnRenderToolStripBorder(e);
+            }
+
             protected override void OnRenderItemImage(ToolStripItemImageRenderEventArgs e)
             {
                 if (e.Image is Bitmap bitmap && bitmap.Width <= 32 && bitmap.Height <= 32)
