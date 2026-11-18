@@ -1,11 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
 using TOM = Microsoft.AnalysisServices.Tabular;
 using System.Globalization;
 using TabularEditor.UIServices;
+using TabularEditor.UI.Extensions;
 using AS = Microsoft.AnalysisServices;
 
 namespace TabularEditor.UI.Dialogs.Pages
@@ -24,6 +26,93 @@ namespace TabularEditor.UI.Dialogs.Pages
         public bool ClearSelection { get; set; } = false;
         public string PreselectDb { get; set; } = "";
 
+        private readonly Dictionary<DataGridViewColumn, TextBox> columnFilters = new Dictionary<DataGridViewColumn, TextBox>();
+        private List<DatabaseInfo> databases;
+
+        internal void EnableColumnFilters()
+        {
+            var filterPanel = new Panel { BackColor = SystemColors.Control };
+            dataGridView1.Controls.Add(filterPanel);
+
+            foreach (DataGridViewColumn column in dataGridView1.Columns)
+            {
+                if (string.IsNullOrEmpty(column.DataPropertyName)) continue;
+
+                var filter = new TextBox { AccessibleName = "Filter " + column.HeaderText };
+                columnFilters.Add(column, filter);
+                filterPanel.Controls.Add(filter);
+                filter.HandleCreated += (sender, args) => filter.SetCueBanner(filter.AccessibleName);
+                filter.TextChanged += (sender, args) => ApplyColumnFilters();
+            }
+
+            void LayoutColumnFilters()
+            {
+                var filterHeight = columnFilters[colName].PreferredHeight + 4;
+                var headerStyle = dataGridView1.ColumnHeadersDefaultCellStyle;
+                headerStyle.Padding = new Padding(0, 0, 0, filterHeight);
+                dataGridView1.ColumnHeadersHeight = (headerStyle.Font ?? dataGridView1.Font).Height + 8 + filterHeight;
+
+                var iconHeader = dataGridView1.GetCellDisplayRectangle(DatabaseIcon.Index, -1, true);
+                if (iconHeader.IsEmpty) return;
+
+                filterPanel.SetBounds(iconHeader.Left, iconHeader.Bottom - filterHeight,
+                    Math.Max(0, dataGridView1.ClientSize.Width - 2 * iconHeader.Left), filterHeight);
+                foreach (var entry in columnFilters)
+                {
+                    var bounds = dataGridView1.GetColumnDisplayRectangle(entry.Key.Index, true);
+                    var left = Math.Max(bounds.Left, iconHeader.Right);
+                    var width = Math.Min(bounds.Right, filterPanel.Right) - left;
+                    entry.Value.Visible = width > 4;
+                    if (width > 4)
+                        entry.Value.SetBounds(left - filterPanel.Left + 2, 2, width - 4, entry.Value.PreferredHeight);
+                }
+            }
+
+            dataGridView1.Scroll += (sender, args) =>
+            {
+                // The grid updates its displayed column rectangles after raising Scroll.
+                if (args.ScrollOrientation == ScrollOrientation.HorizontalScroll && dataGridView1.IsHandleCreated)
+                    dataGridView1.BeginInvoke((MethodInvoker)LayoutColumnFilters);
+            };
+            dataGridView1.DataBindingComplete += (sender, args) => LayoutColumnFilters();
+            dataGridView1.ColumnWidthChanged += (sender, args) => LayoutColumnFilters();
+            dataGridView1.ClientSizeChanged += (sender, args) => LayoutColumnFilters();
+            dataGridView1.VisibleChanged += (sender, args) => LayoutColumnFilters();
+            dataGridView1.FontChanged += (sender, args) => LayoutColumnFilters();
+            dataGridView1.DpiChangedAfterParent += (sender, args) => LayoutColumnFilters();
+            LayoutColumnFilters();
+        }
+
+        private void ApplyColumnFilters()
+        {
+            if (databases == null) return;
+
+            var matches = databases.AsEnumerable();
+            foreach (var entry in columnFilters)
+            {
+                var query = entry.Value.Text.Trim();
+                if (query.Length == 0) continue;
+
+                var getValue = GetColumnValue(entry.Key);
+                matches = matches.Where(db => CultureInfo.CurrentCulture.CompareInfo.IndexOf(
+                    Convert.ToString(getValue(db), CultureInfo.CurrentCulture) ?? "",
+                    query, CompareOptions.IgnoreCase) >= 0);
+            }
+
+            var selected = dataGridView1.SelectedRows.Cast<DataGridViewRow>().FirstOrDefault()?.DataBoundItem as DatabaseInfo;
+            var list = SortDatabases(matches, GetColumnValue(sortedColumn));
+            var index = list.IndexOf(selected);
+
+            suspendSelectionChanged = true;
+            dataGridView1.DataSource = list;
+            dataGridView1.CurrentCell = index >= 0 ? dataGridView1.Rows[index].Cells[0] : null;
+            dataGridView1.ClearSelection();
+            if (index >= 0) dataGridView1.Rows[index].Selected = true;
+            txtDatabaseName.Text = index >= 0 ? selected.Name : "";
+            suspendSelectionChanged = false;
+            OnValidation();
+        }
+
         private TOM.Server _server;
         public TOM.Server Server
         {
@@ -32,14 +121,15 @@ namespace TabularEditor.UI.Dialogs.Pages
                 _server = value;
                 if (_server == null)
                 {
+                    databases = null;
                     dataGridView1.DataSource = null;
                     dataGridView1.ClearSelection();
                 }
                 else
                 {
                     dataGridView1.DataBindingComplete += dataGridView1_DataBindingComplete;
-                    var dbList = DatabaseInfo.GetDatabasesFromServer(_server).OrderBy(db => db.Name).ToList();
-                    dataGridView1.DataSource = dbList;
+                    databases = DatabaseInfo.GetDatabasesFromServer(_server).OrderBy(db => db.Name).ToList();
+                    dataGridView1.DataSource = databases;
 
                     // Default sort
                     sortedColumn = dataGridView1.Columns.Cast<DataGridViewColumn>().FirstOrDefault(c => c.DataPropertyName == "Name");
@@ -200,11 +290,31 @@ namespace TabularEditor.UI.Dialogs.Pages
         private DataGridViewColumn sortedColumn;
         private SortOrder sortOrder = SortOrder.None;
 
+        private static Func<DatabaseInfo, object> GetColumnValue(DataGridViewColumn column)
+        {
+            switch (column?.DataPropertyName)
+            {
+                case "ID": return db => db.ID;
+                case "Name": return db => db.Name;
+                case "CompatibilityLevel": return db => db.CompatibilityLevel;
+                case "LastUpdate": return db => db.LastUpdate;
+                case "Description": return db => db.Description;
+                default: return null;
+            }
+        }
+
+        private List<DatabaseInfo> SortDatabases(IEnumerable<DatabaseInfo> list, Func<DatabaseInfo, object> getValue)
+        {
+            return (sortOrder == SortOrder.Ascending ? list.OrderBy(getValue) : list.OrderByDescending(getValue)).ToList();
+        }
+
         private void dataGridView1_ColumnHeaderMouseClick(object sender, DataGridViewCellMouseEventArgs e)
         {
             if (e.Button != MouseButtons.Left) return;
 
             var column = dataGridView1.Columns[e.ColumnIndex];
+            var keySelector = GetColumnValue(column);
+            if (keySelector == null) return;
 
             if (sortedColumn == column && sortOrder == SortOrder.Ascending)
                 sortOrder = SortOrder.Descending;
@@ -216,22 +326,11 @@ namespace TabularEditor.UI.Dialogs.Pages
             var list = dataGridView1.DataSource as List<DatabaseInfo>;
             if (list == null) return;
 
-            Func<DatabaseInfo, object> keySelector = null;
-            var propName = column.DataPropertyName;
-            if (string.IsNullOrEmpty(propName)) propName = column.Name;
-
-            if (propName.Equals("ID", StringComparison.OrdinalIgnoreCase))
-                keySelector = db => db.ID;
-            else if (propName.Equals("Name", StringComparison.OrdinalIgnoreCase))
-                keySelector = db => db.Name;
-            else if (propName.Equals("CompatibilityLevel", StringComparison.OrdinalIgnoreCase))
-                keySelector = db => db.CompatibilityLevel;
-            else if (propName.Equals("LastUpdate", StringComparison.OrdinalIgnoreCase))
-                keySelector = db => db.LastUpdate;
-            else if (propName.Equals("Description", StringComparison.OrdinalIgnoreCase))
-                keySelector = db => db.Description;
-
-            if (keySelector != null)
+            if (columnFilters.Count > 0)
+            {
+                ApplyColumnFilters();
+            }
+            else
             {
                 // Preserve selection
                 string selectedName = null;
@@ -240,10 +339,7 @@ namespace TabularEditor.UI.Dialogs.Pages
                     selectedName = (dataGridView1.SelectedRows[0].DataBoundItem as DatabaseInfo)?.Name;
                 }
 
-                if (sortOrder == SortOrder.Ascending)
-                    list = list.OrderBy(keySelector).ToList();
-                else
-                    list = list.OrderByDescending(keySelector).ToList();
+                list = SortDatabases(list, keySelector);
 
                 dataGridView1.DataSource = list;
 

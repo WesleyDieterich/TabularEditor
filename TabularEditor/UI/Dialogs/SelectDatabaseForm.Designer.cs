@@ -41,7 +41,7 @@
             // 
             this.btnCancel.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
             this.btnCancel.DialogResult = System.Windows.Forms.DialogResult.Cancel;
-            this.btnCancel.Location = new System.Drawing.Point(487, 227);
+            this.btnCancel.Location = new System.Drawing.Point(606, 251);
             this.btnCancel.Name = "btnCancel";
             this.btnCancel.Size = new System.Drawing.Size(88, 23);
             this.btnCancel.TabIndex = 2;
@@ -53,7 +53,7 @@
             this.btnOK.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
             this.btnOK.DialogResult = System.Windows.Forms.DialogResult.OK;
             this.btnOK.Enabled = false;
-            this.btnOK.Location = new System.Drawing.Point(393, 227);
+            this.btnOK.Location = new System.Drawing.Point(512, 251);
             this.btnOK.Name = "btnOK";
             this.btnOK.Size = new System.Drawing.Size(88, 23);
             this.btnOK.TabIndex = 1;
@@ -83,7 +83,7 @@
             this.databasePage1.Location = new System.Drawing.Point(12, 12);
             this.databasePage1.Name = "databasePage1";
             this.databasePage1.Server = null;
-            this.databasePage1.Size = new System.Drawing.Size(563, 209);
+            this.databasePage1.Size = new System.Drawing.Size(682, 233);
             this.databasePage1.TabIndex = 0;
             this.databasePage1.Validation += new TabularEditor.UI.Dialogs.ValidationEventHandler(this.databasePage1_Validation);
             this.databasePage1.Accept += new System.EventHandler(this.databasePage1_Accept);
@@ -94,7 +94,7 @@
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.CancelButton = this.btnCancel;
-            this.ClientSize = new System.Drawing.Size(587, 262);
+            this.ClientSize = new System.Drawing.Size(706, 286);
             this.ControlBox = false;
             this.Controls.Add(this.databasePage1);
             this.Controls.Add(this.btnCancel);

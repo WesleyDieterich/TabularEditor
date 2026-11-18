@@ -16,6 +16,7 @@ namespace TabularEditor.UI.Dialogs
         public SelectDatabaseForm()
         {
             InitializeComponent();
+            databasePage1.EnableColumnFilters();
         }
 
         public static DialogResult Show(Server server)
