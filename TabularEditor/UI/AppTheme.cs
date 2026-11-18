@@ -343,7 +343,47 @@ namespace TabularEditor.UI
 
         private sealed class DarkRenderer : ToolStripProfessionalRenderer
         {
+            private readonly ConditionalWeakTable<Image, Image> softenedIcons = new ConditionalWeakTable<Image, Image>();
+
             public DarkRenderer() : base(new DarkColors()) { RoundedEdges = false; }
+
+            protected override void OnRenderItemImage(ToolStripItemImageRenderEventArgs e)
+            {
+                if (e.Image is Bitmap bitmap && bitmap.Width <= 32 && bitmap.Height <= 32)
+                {
+                    var image = softenedIcons.GetValue(bitmap, SoftenIconHighlights);
+                    if (!ReferenceEquals(image, bitmap))
+                        e = new ToolStripItemImageRenderEventArgs(e.Graphics, e.Item, image, e.ImageRectangle);
+                }
+                base.OnRenderItemImage(e);
+            }
+
+            private static Image SoftenIconHighlights(Image image)
+            {
+                var source = (Bitmap)image;
+                Bitmap softened = null;
+                for (var y = 0; y < source.Height; y++)
+                {
+                    for (var x = 0; x < source.Width; x++)
+                    {
+                        var pixel = source.GetPixel(x, y);
+                        if (pixel.A == 0) continue;
+
+                        // Old glyphs use near-white outlines. Keep the alpha and colored accents.
+                        var minimum = Math.Min(pixel.R, Math.Min(pixel.G, pixel.B));
+                        var spread = Math.Max(pixel.R, Math.Max(pixel.G, pixel.B)) - minimum;
+                        if (minimum <= 165 || spread >= 24) continue;
+
+                        var reduction = (int)Math.Round(68 * (minimum - 165) / 90.0 * (24 - spread) / 24.0);
+                        if (reduction == 0) continue;
+                        if (softened == null) softened = new Bitmap(source);
+                        softened.SetPixel(x, y, Color.FromArgb(pixel.A,
+                            pixel.R - reduction, pixel.G - reduction, pixel.B - reduction));
+                    }
+                }
+                return softened ?? image;
+            }
+
             protected override void OnRenderItemText(ToolStripItemTextRenderEventArgs e)
             {
                 e.TextColor = e.Item.Enabled ? Text : Muted;
@@ -386,6 +426,7 @@ namespace TabularEditor.UI
             public override Color ButtonCheckedGradientBegin => Selection;
             public override Color ButtonCheckedGradientMiddle => Selection;
             public override Color ButtonCheckedGradientEnd => Selection;
+            public override Color ButtonCheckedHighlightBorder => Border;
             public override Color ButtonSelectedGradientBegin => Raised;
             public override Color ButtonSelectedGradientMiddle => Raised;
             public override Color ButtonSelectedGradientEnd => Raised;

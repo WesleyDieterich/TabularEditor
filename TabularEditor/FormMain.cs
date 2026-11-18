@@ -111,6 +111,7 @@ Selected.Hierarchies.ForEach(item => item.TranslatedDisplayFolders.SetAll(item.D
             txtExpression.Font = codeFont;
             txtAdvanced.Font = codeFont;
             lblCurrentMeasure.Font = codeFont;
+            ArrangeWorkspaceToolbars();
 
             var renderer = new ToolStripProfessionalRenderer(new WorkspaceColors()) { RoundedEdges = false };
             foreach (var strip in new ToolStrip[] { menuStrip1, toolStrip2, toolModelSearch, toolTreeView, toolStrip3, toolStrip4, toolPropertiesPane, statusStrip1 })
@@ -136,6 +137,58 @@ Selected.Hierarchies.ForEach(item => item.TranslatedDisplayFolders.SetAll(item.D
             splitContainer2.BackColor = SystemColors.ControlLight;
             txtExpression.BorderStyle = BorderStyle.None;
             txtAdvanced.BorderStyle = BorderStyle.None;
+        }
+
+        private void ArrangeWorkspaceToolbars()
+        {
+            GroupCommands(toolModelSearch, "Results", toolStripButton5, toolStripButton4, toolStripButton7);
+            GroupCommands(toolTreeView, "View", tbShowDisplayFolders, tbShowHidden, toolStripButton6,
+                tbSortAlphabetically, tbShowAllObjectTypes);
+            GroupCommands(toolStrip3, "Edit", btnFind, btnReplace, toolStripButton1, toolStripButton2);
+            GroupCommands(toolStrip4, "Edit", toolStripButton11, toolStripButton12, toolStripButton13, toolStripButton14);
+
+            cmbExpressionSelector.Width = (int)Math.Round(148 * DeviceDpi / 96.0);
+
+            var gap = Math.Max(2, (int)Math.Round(3 * DeviceDpi / 96.0));
+            foreach (var strip in new[] { toolStrip2, toolTreeView, toolStrip3, toolStrip4 })
+            {
+                strip.Padding = new Padding(2 * gap, gap, 2 * gap, gap);
+                foreach (ToolStripItem item in strip.Items)
+                {
+                    if (item is ToolStripSeparator)
+                        item.Margin = new Padding(gap, 0, gap, 0);
+                    else if (item is ToolStripButton || item is ToolStripDropDownItem)
+                    {
+                        item.Margin = new Padding(1, 1, 1, 1);
+                        item.Padding = new Padding(gap, 1, gap, 1);
+                    }
+                }
+            }
+            toolModelSearch.Padding = new Padding(2 * gap, gap, 2 * gap, gap);
+            tbApplyFilter.Padding = new Padding(gap, 1, gap, 1);
+        }
+
+        private static void GroupCommands(ToolStrip strip, string label, params ToolStripButton[] buttons)
+        {
+            var menu = new ToolStripDropDownButton(label);
+            var index = strip.Items.IndexOf(buttons[0]);
+            strip.Items.Insert(index, menu);
+            foreach (var button in buttons)
+            {
+                strip.Items.Remove(button);
+                button.DisplayStyle = ToolStripItemDisplayStyle.ImageAndText;
+                button.Margin = Padding.Empty;
+                menu.DropDownItems.Add(button);
+            }
+
+            // Collapse separators that no longer divide a pair of command groups.
+            var separators = strip.Items.OfType<ToolStripSeparator>().ToArray();
+            foreach (var separator in separators)
+            {
+                var position = strip.Items.IndexOf(separator);
+                if (position == 0 || position == strip.Items.Count - 1 || strip.Items[position - 1] is ToolStripSeparator)
+                    strip.Items.Remove(separator);
+            }
         }
 
         internal static Font CreateWorkspaceFont(string preferred, string fallback, float size)
