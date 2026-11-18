@@ -56,6 +56,7 @@ namespace TabularEditor.UI
         }
 
         public bool ExpressionEditor_IsEditing { get; private set; } = false;
+        private DaxIntelliSense daxIntelliSense;
 
         private void ExpressionEditor_Init()
         {
@@ -63,6 +64,7 @@ namespace TabularEditor.UI
             UI.ExpressionEditor.KeyPress += ExpressionEditor_KeyPress;
             UI.ExpressionEditor.DragEnter += ExpressionEditor_DragEnter;
             UI.ExpressionEditor.DragLeave += ExpressionEditor_DragLeave;
+            daxIntelliSense = new DaxIntelliSense(UI.ExpressionEditor, () => ExpressionEditor_IsDax, () => Handler?.Model);
 
             UI.ExpressionSelector.ComboBox.ValueMember = "Value";
             UI.ExpressionSelector.ComboBox.DisplayMember = "Description";
@@ -330,6 +332,7 @@ namespace TabularEditor.UI
 
         private void ExpressionEditor_SetText()
         {
+            daxIntelliSense?.Close();
             ExpressionEditor_SuspendTextChanged = true;
 
             var i = UI.ExpressionEditor.SelectionStart;

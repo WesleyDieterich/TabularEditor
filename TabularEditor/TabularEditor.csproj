@@ -296,7 +296,10 @@
       <SubType>Component</SubType>
     </Compile>
     <Compile Include="TextServices\CSharpLexer.cs" />
+    <Compile Include="TextServices\DaxCaretContext.cs" />
+    <Compile Include="TextServices\DaxFunctionCatalog.cs" />
     <Compile Include="TextServices\ExpressionParser.cs" />
+    <Compile Include="UI\DaxIntelliSense.cs" />
     <Compile Include="UIServices\ModelTelemetry.cs" />
     <Compile Include="UIServices\WildcardMatch.cs" />
     <Compile Include="UI\Actions\CreateRelationshipAction.cs" />
@@ -644,6 +647,7 @@
     <Compile Include="UI\UIHelper.cs" />
     <Compile Include="UI\UISelectionList.cs" />
     <Compile Include="UI\UITreeSelection.cs" />
+    <EmbeddedResource Include="TextServices\DaxFunctions.tsv" />
     <EmbeddedResource Include="BestPracticeAnalyzer\BPAEditorForm.resx">
       <DependentUpon>BPAEditorForm.cs</DependentUpon>
     </EmbeddedResource>
