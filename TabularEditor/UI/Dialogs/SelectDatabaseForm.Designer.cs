@@ -31,19 +31,19 @@
             this.components = new System.ComponentModel.Container();
             this.btnCancel = new System.Windows.Forms.Button();
             this.btnOK = new System.Windows.Forms.Button();
-            this.databaseBindingSource = new System.Windows.Forms.BindingSource(this.components);
-            this.dataGridViewImageColumn1 = new System.Windows.Forms.DataGridViewImageColumn();
+            this.lblTitle = new System.Windows.Forms.Label();
+            this.lblFilterHint = new System.Windows.Forms.Label();
+            this.lblModelCount = new System.Windows.Forms.Label();
             this.databasePage1 = new TabularEditor.UI.Dialogs.Pages.DatabasePage();
-            ((System.ComponentModel.ISupportInitialize)(this.databaseBindingSource)).BeginInit();
             this.SuspendLayout();
             // 
             // btnCancel
             // 
             this.btnCancel.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
             this.btnCancel.DialogResult = System.Windows.Forms.DialogResult.Cancel;
-            this.btnCancel.Location = new System.Drawing.Point(606, 251);
+            this.btnCancel.Location = new System.Drawing.Point(850, 456);
             this.btnCancel.Name = "btnCancel";
-            this.btnCancel.Size = new System.Drawing.Size(88, 23);
+            this.btnCancel.Size = new System.Drawing.Size(94, 30);
             this.btnCancel.TabIndex = 2;
             this.btnCancel.Text = "Cancel";
             this.btnCancel.UseVisualStyleBackColor = true;
@@ -53,26 +53,32 @@
             this.btnOK.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
             this.btnOK.DialogResult = System.Windows.Forms.DialogResult.OK;
             this.btnOK.Enabled = false;
-            this.btnOK.Location = new System.Drawing.Point(512, 251);
+            this.btnOK.Location = new System.Drawing.Point(732, 456);
             this.btnOK.Name = "btnOK";
-            this.btnOK.Size = new System.Drawing.Size(88, 23);
+            this.btnOK.Size = new System.Drawing.Size(110, 30);
             this.btnOK.TabIndex = 1;
-            this.btnOK.Text = "OK";
+            this.btnOK.Text = "Open model";
             this.btnOK.UseVisualStyleBackColor = true;
             // 
-            // databaseBindingSource
+            // lblTitle
             // 
-            this.databaseBindingSource.DataSource = typeof(Microsoft.AnalysisServices.Tabular.Database);
+            this.lblTitle.AutoSize = true;
+            this.lblTitle.Location = new System.Drawing.Point(16, 14);
+            this.lblTitle.Text = "Semantic models";
             // 
-            // dataGridViewImageColumn1
+            // lblFilterHint
             // 
-            this.dataGridViewImageColumn1.FillWeight = 20F;
-            this.dataGridViewImageColumn1.Frozen = true;
-            this.dataGridViewImageColumn1.HeaderText = "";
-            this.dataGridViewImageColumn1.Image = global::TabularEditor.Resources.DatabaseMethod_16x;
-            this.dataGridViewImageColumn1.Name = "dataGridViewImageColumn1";
-            this.dataGridViewImageColumn1.ReadOnly = true;
-            this.dataGridViewImageColumn1.Width = 20;
+            this.lblFilterHint.AutoSize = true;
+            this.lblFilterHint.ForeColor = System.Drawing.SystemColors.GrayText;
+            this.lblFilterHint.Location = new System.Drawing.Point(16, 45);
+            this.lblFilterHint.Text = "Type below a column heading to filter the list.";
+            //
+            // lblModelCount
+            //
+            this.lblModelCount.Anchor = System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left;
+            this.lblModelCount.AutoSize = true;
+            this.lblModelCount.ForeColor = System.Drawing.SystemColors.GrayText;
+            this.lblModelCount.Location = new System.Drawing.Point(16, 463);
             // 
             // databasePage1
             // 
@@ -80,10 +86,10 @@
             this.databasePage1.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.databasePage1.Location = new System.Drawing.Point(12, 12);
+            this.databasePage1.Location = new System.Drawing.Point(16, 74);
             this.databasePage1.Name = "databasePage1";
             this.databasePage1.Server = null;
-            this.databasePage1.Size = new System.Drawing.Size(682, 233);
+            this.databasePage1.Size = new System.Drawing.Size(928, 368);
             this.databasePage1.TabIndex = 0;
             this.databasePage1.Validation += new TabularEditor.UI.Dialogs.ValidationEventHandler(this.databasePage1_Validation);
             this.databasePage1.Accept += new System.EventHandler(this.databasePage1_Accept);
@@ -91,29 +97,33 @@
             // SelectDatabaseForm
             // 
             this.AcceptButton = this.btnOK;
-            this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
-            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
+            this.AutoScaleDimensions = new System.Drawing.SizeF(96F, 96F);
+            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Dpi;
             this.CancelButton = this.btnCancel;
-            this.ClientSize = new System.Drawing.Size(706, 286);
+            this.ClientSize = new System.Drawing.Size(960, 502);
+            this.MinimumSize = new System.Drawing.Size(675, 340);
             this.ControlBox = false;
             this.Controls.Add(this.databasePage1);
             this.Controls.Add(this.btnCancel);
             this.Controls.Add(this.btnOK);
+            this.Controls.Add(this.lblTitle);
+            this.Controls.Add(this.lblFilterHint);
+            this.Controls.Add(this.lblModelCount);
             this.Name = "SelectDatabaseForm";
             this.ShowInTaskbar = false;
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterParent;
-            this.Text = "Choose Database";
-            this.Shown += new System.EventHandler(this.SelectDatabaseForm_Shown);
-            ((System.ComponentModel.ISupportInitialize)(this.databaseBindingSource)).EndInit();
+            this.Text = "Choose a semantic model";
             this.ResumeLayout(false);
+            this.PerformLayout();
 
         }
 
         #endregion
-        private System.Windows.Forms.BindingSource databaseBindingSource;
         private System.Windows.Forms.Button btnCancel;
         private System.Windows.Forms.Button btnOK;
-        private System.Windows.Forms.DataGridViewImageColumn dataGridViewImageColumn1;
+        private System.Windows.Forms.Label lblTitle;
+        private System.Windows.Forms.Label lblFilterHint;
+        private System.Windows.Forms.Label lblModelCount;
         private Pages.DatabasePage databasePage1;
     }
 }

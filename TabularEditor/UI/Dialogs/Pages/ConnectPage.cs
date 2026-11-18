@@ -52,6 +52,16 @@ namespace TabularEditor.UI.Dialogs.Pages
 
         public LocalInstance LocalInstance => comboBox1.SelectedItem as LocalInstance;
 
+        internal void SelectServer(string address, AuthenticationMode authenticationMode)
+        {
+            comboBox1.SelectedIndex = -1;
+            txtServer.Text = address;
+            txtUsername.Clear();
+            txtPassword.Clear();
+            AuthenticationMode = authenticationMode;
+            ValidateUI(this, EventArgs.Empty);
+        }
+
         public Server GetServer()
         {
             var result = new Server();
@@ -183,9 +193,20 @@ namespace TabularEditor.UI.Dialogs.Pages
             }
         }
 
-        private void txtServer_KeyPress(object sender, KeyPressEventArgs e)
+        protected override void OnLayout(LayoutEventArgs e)
+        {
+            base.OnLayout(e);
+            if (txtServer == null || comboBox1 == null) return;
+
+            // The page is also embedded in the deployment wizard, with a different font and width.
+            txtServer.Width = Math.Max(0, ClientSize.Width - txtServer.Left - 2);
+            comboBox1.Width = Math.Max(0, ClientSize.Width - comboBox1.Left - 2);
+        }
+
+        private void txtServer_TextUpdate(object sender, EventArgs e)
         {
             comboBox1.SelectedIndex = -1;
+            ValidateUI(sender, e);
         }
 
         private void comboBox1_SelectionChangeCommitted(object sender, EventArgs e)

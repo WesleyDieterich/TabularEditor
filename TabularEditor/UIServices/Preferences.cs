@@ -20,6 +20,7 @@ namespace TabularEditor.UIServices
     {
         #region Serializable properties
         public bool CheckForUpdates = false;
+        public List<ConnectionFavorite> ConnectionFavorites = new List<ConnectionFavorite>();
         public bool SkipPatchUpdates = false;
         public bool CollectTelemetry = true;
         public bool FormulaFixup = true;
@@ -214,6 +215,12 @@ namespace TabularEditor.UIServices
             }
         }
         #endregion
+    }
+
+    public class ConnectionFavorite
+    {
+        public string Address;
+        public UI.Dialogs.Pages.AuthenticationMode Authentication;
     }
 
     public class ColumnPreferences

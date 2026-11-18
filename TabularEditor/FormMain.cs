@@ -29,18 +29,16 @@ namespace TabularEditor
             Singleton = this;
             Thread.CurrentThread.CurrentUICulture = new System.Globalization.CultureInfo("en-US");
             InitializeComponent();
+            StyleWorkspace();
+            ConfigurePropertiesPane();
 
             dlgOpenFile.Filter = "All supported files|*.bim;database.json;model.tmd;model.tmdl;database.tmdl;*.pbit;*.pbip|Tabular Model Files|*.bim;database.json;model.tmd;model.tmdl;database.tmdl|Power BI Files|*.pbit;*.pbip|All files|*.*";
-
-            // For some reason, Visual Studio sometimes removes this from the FormMain.Designer.cs, making the
-            // colors of the lines look ugly:
-            propertyGrid1.LineColor = System.Drawing.SystemColors.InactiveBorder;
 
             // Assign our own custom Designer, to make sure we can handle property changes on multiple objects simultaneously:
             propertyGrid1.Site = new DesignerHost();
 
             SetupUIController();
-            txtFilter.Control.SetCueBanner("Filter");
+            txtFilter.Control.SetCueBanner("Search model");
 
             ///// Populate macros and samples /////
             // TODO: Do this somewhere else
@@ -94,6 +92,151 @@ Selected.Hierarchies.ForEach(item => item.TranslatedDisplayFolders[Selected.Cult
 Selected.Columns.ForEach(item => item.TranslatedDisplayFolders.SetAll(item.DisplayFolder));
 Selected.Hierarchies.ForEach(item => item.TranslatedDisplayFolders.SetAll(item.DisplayFolder));");
             });
+        }
+
+        private void StyleWorkspace()
+        {
+            var workspaceFont = CreateWorkspaceFont("Segoe UI Variable Text", "Segoe UI", 9.5f);
+            var paneTitleFont = new Font(workspaceFont, FontStyle.Bold);
+            var codeFont = CreateWorkspaceFont("Cascadia Mono", "Consolas", 9.75f);
+            Font = workspaceFont;
+            tvModel.Font = workspaceFont;
+            txtExpression.Font = codeFont;
+            txtAdvanced.Font = codeFont;
+            lblCurrentMeasure.Font = codeFont;
+
+            var renderer = new ToolStripProfessionalRenderer(new WorkspaceColors()) { RoundedEdges = false };
+            foreach (var strip in new ToolStrip[] { menuStrip1, toolStrip2, toolModelSearch, toolTreeView, toolStrip3, toolStrip4, toolPropertiesPane, statusStrip1 })
+            {
+                strip.Renderer = renderer;
+                strip.Font = workspaceFont;
+            }
+
+            lblModelPane.Font = paneTitleFont;
+            lblPropertiesPane.Font = paneTitleFont;
+            lblPropertyObject.Font = paneTitleFont;
+            Disposed += (sender, args) =>
+            {
+                paneTitleFont.Dispose();
+                codeFont.Dispose();
+                workspaceFont.Dispose();
+            };
+
+            tvModel.BorderStyle = BorderStyle.None;
+            tvModel.RowHeight = Math.Max(tvModel.RowHeight, (int)Math.Round(22 * DeviceDpi / 96.0));
+            lblModelPane.BackColor = SystemColors.Control;
+            splitContainer1.BackColor = SystemColors.ControlLight;
+            splitContainer2.BackColor = SystemColors.ControlLight;
+            txtExpression.BorderStyle = BorderStyle.None;
+            txtAdvanced.BorderStyle = BorderStyle.None;
+        }
+
+        internal static Font CreateWorkspaceFont(string preferred, string fallback, float size)
+        {
+            var font = new Font(preferred, size);
+            if (string.Equals(font.Name, preferred, StringComparison.OrdinalIgnoreCase)) return font;
+
+            font.Dispose();
+            return new Font(fallback, size);
+        }
+
+        private void ConfigurePropertiesPane()
+        {
+            propertyGrid1.ToolbarVisible = false;
+            propertyGrid1.ViewBorderColor = SystemColors.Window;
+            propertyGrid1.HelpBorderColor = SystemColors.ControlLight;
+            propertyGrid1.LineColor = SystemColors.ControlLightLight;
+            lblPropertyObject.BackColor = SystemColors.Window;
+            lblPropertyContext.BackColor = SystemColors.Window;
+
+            if (!SystemInformation.HighContrast)
+            {
+                lblPropertyContext.ForeColor = Color.FromArgb(82, 94, 110);
+                propertyGrid1.LineColor = Color.FromArgb(240, 243, 247);
+                propertyGrid1.CategorySplitterColor = Color.FromArgb(232, 239, 247);
+                propertyGrid1.CategoryForeColor = Color.FromArgb(47, 62, 80);
+                propertyGrid1.HelpBackColor = Color.FromArgb(246, 249, 252);
+                propertyGrid1.SelectedItemWithFocusBackColor = Color.FromArgb(222, 235, 249);
+                propertyGrid1.SelectedItemWithFocusForeColor = SystemColors.WindowText;
+            }
+
+            var grouped = new ToolStripMenuItem("Grouped");
+            var alphabetical = new ToolStripMenuItem("Alphabetical");
+            grouped.Click += (sender, args) => propertyGrid1.PropertySort = PropertySort.CategorizedAlphabetical;
+            alphabetical.Click += (sender, args) => propertyGrid1.PropertySort = PropertySort.Alphabetical;
+            btnPropertyOrder.DropDownItems.AddRange(new ToolStripItem[] { grouped, alphabetical });
+
+            void UpdatePropertyOrder()
+            {
+                grouped.Checked = (propertyGrid1.PropertySort & PropertySort.Categorized) != 0;
+                alphabetical.Checked = !grouped.Checked;
+                btnPropertyOrder.Text = grouped.Checked ? "Grouped" : "A–Z";
+            }
+
+            ITabularNamedObject namedSelection = null;
+            void UpdatePropertyContext()
+            {
+                var count = propertyGrid1.SelectedObjects.Length;
+                lblPropertyObject.Text = count == 0 ? "Select a model object"
+                    : count == 1 ? namedSelection?.Name ?? propertyGrid1.SelectedObject.ToString()
+                    : $"{count} objects selected";
+                var parent = (namedSelection as ITabularTableObject)?.Table;
+                var type = namedSelection?.GetTypeName();
+                lblPropertyContext.Text = parent == null ? type : $"{type} · {parent.Name}";
+                lblPropertyContext.Visible = !string.IsNullOrEmpty(lblPropertyContext.Text);
+                btnPropertyOrder.Enabled = count > 0;
+            }
+
+            void SelectedNameChanged(object sender, System.ComponentModel.PropertyChangedEventArgs args)
+            {
+                if (args.PropertyName == nameof(ITabularNamedObject.Name)) UpdatePropertyContext();
+            }
+
+            propertyGrid1.SelectedObjectsChanged += (sender, args) =>
+            {
+                if (namedSelection != null) namedSelection.PropertyChanged -= SelectedNameChanged;
+                namedSelection = propertyGrid1.SelectedObjects.Length == 1 ? propertyGrid1.SelectedObject as ITabularNamedObject : null;
+                if (namedSelection != null) namedSelection.PropertyChanged += SelectedNameChanged;
+                UpdatePropertyContext();
+            };
+            Disposed += (sender, args) =>
+            {
+                if (namedSelection != null) namedSelection.PropertyChanged -= SelectedNameChanged;
+            };
+            propertyGrid1.PropertySortChanged += (sender, args) => UpdatePropertyOrder();
+            UpdatePropertyContext();
+            UpdatePropertyOrder();
+        }
+
+        private void TogglePropertiesPane(object sender, EventArgs e)
+        {
+            if (!splitContainer2.Panel2Collapsed && propertyGrid1.ContainsFocus)
+                tvModel.Focus();
+
+            splitContainer2.Panel2Collapsed = !splitContainer2.Panel2Collapsed;
+            btnPropertiesPane.Checked = !splitContainer2.Panel2Collapsed;
+            menuPropertiesPane.Checked = btnPropertiesPane.Checked;
+        }
+
+        private sealed class WorkspaceColors : ProfessionalColorTable
+        {
+            private static Color CheckedSurface => SystemInformation.HighContrast
+                ? SystemColors.Highlight
+                : Color.FromArgb(222, 235, 249);
+
+            public override Color ToolStripGradientBegin => SystemColors.Control;
+            public override Color ToolStripGradientMiddle => SystemColors.Control;
+            public override Color ToolStripGradientEnd => SystemColors.Control;
+            public override Color MenuStripGradientBegin => SystemColors.Control;
+            public override Color MenuStripGradientEnd => SystemColors.Control;
+            public override Color StatusStripGradientBegin => SystemColors.Control;
+            public override Color StatusStripGradientEnd => SystemColors.Control;
+            public override Color ToolStripBorder => SystemColors.ControlLight;
+            public override Color ButtonCheckedGradientBegin => CheckedSurface;
+            public override Color ButtonCheckedGradientMiddle => CheckedSurface;
+            public override Color ButtonCheckedGradientEnd => CheckedSurface;
+            public override Color ButtonCheckedHighlightBorder => SystemColors.ControlDark;
+            public override Color ButtonSelectedBorder => SystemColors.ControlDark;
         }
 
         private void PopulateMacrosDropDown()

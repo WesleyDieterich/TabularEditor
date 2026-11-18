@@ -162,8 +162,16 @@ namespace TabularEditor
             this.toolStripSeparator5 = new System.Windows.Forms.ToolStripSeparator();
             this.toolStripLabel2 = new System.Windows.Forms.ToolStripLabel();
             this.cmbTranslation = new System.Windows.Forms.ToolStripComboBox();
-            this.toolStripSeparator4 = new System.Windows.Forms.ToolStripSeparator();
             this.txtFilter = new TabularEditor.ToolStripSpringTextBox();
+            this.toolModelSearch = new System.Windows.Forms.ToolStrip();
+            this.lblModelPane = new System.Windows.Forms.Label();
+            this.toolPropertiesPane = new System.Windows.Forms.ToolStrip();
+            this.lblPropertiesPane = new System.Windows.Forms.ToolStripLabel();
+            this.btnPropertyOrder = new System.Windows.Forms.ToolStripDropDownButton();
+            this.lblPropertyObject = new System.Windows.Forms.Label();
+            this.lblPropertyContext = new System.Windows.Forms.Label();
+            this.btnPropertiesPane = new System.Windows.Forms.ToolStripButton();
+            this.menuPropertiesPane = new System.Windows.Forms.ToolStripMenuItem();
             this.splitContainer1 = new System.Windows.Forms.SplitContainer();
             this.tvModel = new Aga.Controls.Tree.TreeViewAdv();
             this._colName = new Aga.Controls.Tree.TreeColumn();
@@ -256,6 +264,7 @@ namespace TabularEditor
             actionsMain = new Crad.Windows.Forms.Actions.ActionList();
             ((System.ComponentModel.ISupportInitialize)(actionsMain)).BeginInit();
             this.toolStrip2.SuspendLayout();
+            this.toolModelSearch.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.splitContainer1)).BeginInit();
             this.splitContainer1.Panel1.SuspendLayout();
             this.splitContainer1.Panel2.SuspendLayout();
@@ -1643,17 +1652,82 @@ namespace TabularEditor
             this.toolStripSeparator5,
             this.toolStripLabel2,
             this.cmbTranslation,
-            this.toolStripSeparator4,
+            this.btnPropertiesPane});
+            this.toolStrip2.Location = new System.Drawing.Point(0, 24);
+            this.toolStrip2.Name = "toolStrip2";
+            this.toolStrip2.Size = new System.Drawing.Size(1067, 25);
+            this.toolStrip2.TabIndex = 13;
+            this.toolStrip2.Text = "Model commands";
+            //
+            // toolModelSearch
+            //
+            this.toolModelSearch.CanOverflow = false;
+            this.toolModelSearch.GripStyle = System.Windows.Forms.ToolStripGripStyle.Hidden;
+            this.toolModelSearch.Padding = new System.Windows.Forms.Padding(8, 3, 8, 3);
+            this.toolModelSearch.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.txtFilter,
             this.tbApplyFilter,
             this.toolStripButton5,
             this.toolStripButton4,
             this.toolStripButton7});
-            this.toolStrip2.Location = new System.Drawing.Point(0, 24);
-            this.toolStrip2.Name = "toolStrip2";
-            this.toolStrip2.Size = new System.Drawing.Size(1067, 25);
-            this.toolStrip2.TabIndex = 13;
-            this.toolStrip2.Text = "toolStrip2";
+            this.toolModelSearch.Name = "toolModelSearch";
+            this.toolModelSearch.TabIndex = 0;
+            this.toolModelSearch.Text = "Search model";
+            //
+            // lblModelPane
+            //
+            this.lblModelPane.Dock = System.Windows.Forms.DockStyle.Top;
+            this.lblModelPane.Height = 30;
+            this.lblModelPane.Padding = new System.Windows.Forms.Padding(9, 0, 0, 0);
+            this.lblModelPane.Text = "Model explorer";
+            this.lblModelPane.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
+            //
+            // toolPropertiesPane
+            //
+            this.toolPropertiesPane.CanOverflow = false;
+            this.toolPropertiesPane.GripStyle = System.Windows.Forms.ToolStripGripStyle.Hidden;
+            this.toolPropertiesPane.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.lblPropertiesPane,
+            this.btnPropertyOrder});
+            this.toolPropertiesPane.Name = "toolPropertiesPane";
+            this.toolPropertiesPane.Padding = new System.Windows.Forms.Padding(8, 2, 8, 2);
+            this.lblPropertiesPane.Text = "Properties";
+            this.btnPropertyOrder.AccessibleName = "Property order";
+            this.btnPropertyOrder.Alignment = System.Windows.Forms.ToolStripItemAlignment.Right;
+            this.btnPropertyOrder.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Text;
+            //
+            // lblPropertyObject
+            //
+            this.lblPropertyObject.AutoEllipsis = true;
+            this.lblPropertyObject.Dock = System.Windows.Forms.DockStyle.Top;
+            this.lblPropertyObject.Height = 28;
+            this.lblPropertyObject.Name = "lblPropertyObject";
+            this.lblPropertyObject.Padding = new System.Windows.Forms.Padding(11, 3, 11, 0);
+            this.lblPropertyObject.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
+            //
+            // lblPropertyContext
+            //
+            this.lblPropertyContext.AutoEllipsis = true;
+            this.lblPropertyContext.Dock = System.Windows.Forms.DockStyle.Top;
+            this.lblPropertyContext.Height = 24;
+            this.lblPropertyContext.Name = "lblPropertyContext";
+            this.lblPropertyContext.Padding = new System.Windows.Forms.Padding(11, 0, 11, 3);
+            this.lblPropertyContext.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
+            //
+            // btnPropertiesPane
+            //
+            this.btnPropertiesPane.Alignment = System.Windows.Forms.ToolStripItemAlignment.Right;
+            this.btnPropertiesPane.Checked = true;
+            this.btnPropertiesPane.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Text;
+            this.btnPropertiesPane.Text = "Properties";
+            this.btnPropertiesPane.ToolTipText = "Show or hide the properties pane";
+            this.btnPropertiesPane.Click += new System.EventHandler(this.TogglePropertiesPane);
+            //
+            // menuPropertiesPane
+            //
+            this.menuPropertiesPane.Checked = true;
+            this.menuPropertiesPane.Text = "&Properties pane";
+            this.menuPropertiesPane.Click += new System.EventHandler(this.TogglePropertiesPane);
             // 
             // toolStripSeparator3
             // 
@@ -1695,15 +1769,11 @@ namespace TabularEditor
             this.cmbTranslation.Name = "cmbTranslation";
             this.cmbTranslation.Size = new System.Drawing.Size(200, 25);
             // 
-            // toolStripSeparator4
-            // 
-            this.toolStripSeparator4.Name = "toolStripSeparator4";
-            this.toolStripSeparator4.Size = new System.Drawing.Size(6, 25);
-            // 
             // txtFilter
             // 
             this.txtFilter.MaxLength = 0;
             this.txtFilter.Name = "txtFilter";
+            this.txtFilter.AccessibleName = "Search model";
             this.txtFilter.Size = new System.Drawing.Size(385, 25);
             this.txtFilter.ToolTipText = "Filter objects by name. Put a \':\' as the first character to filter using Dynamic " +
     "LINQ";
@@ -1713,6 +1783,7 @@ namespace TabularEditor
             // splitContainer1
             // 
             this.splitContainer1.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.splitContainer1.FixedPanel = System.Windows.Forms.FixedPanel.Panel1;
             this.splitContainer1.Location = new System.Drawing.Point(0, 49);
             this.splitContainer1.Name = "splitContainer1";
             // 
@@ -1720,12 +1791,17 @@ namespace TabularEditor
             // 
             this.splitContainer1.Panel1.Controls.Add(this.tvModel);
             this.splitContainer1.Panel1.Controls.Add(this.toolTreeView);
+            this.splitContainer1.Panel1.Controls.Add(this.toolModelSearch);
+            this.splitContainer1.Panel1.Controls.Add(this.lblModelPane);
             // 
             // splitContainer1.Panel2
             // 
             this.splitContainer1.Panel2.Controls.Add(this.splitContainer2);
             this.splitContainer1.Size = new System.Drawing.Size(1067, 569);
-            this.splitContainer1.SplitterDistance = 405;
+            this.splitContainer1.SplitterDistance = 272;
+            this.splitContainer1.Panel1MinSize = 200;
+            this.splitContainer1.Panel2MinSize = 430;
+            this.splitContainer1.SplitterWidth = 6;
             this.splitContainer1.TabIndex = 16;
             // 
             // tvModel
@@ -1867,7 +1943,7 @@ namespace TabularEditor
             // 
             // toolTreeView
             // 
-            this.toolTreeView.CanOverflow = false;
+            this.toolTreeView.CanOverflow = true;
             this.toolTreeView.GripStyle = System.Windows.Forms.ToolStripGripStyle.Hidden;
             this.toolTreeView.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.toolStripLabel3,
@@ -1912,7 +1988,7 @@ namespace TabularEditor
             this.splitContainer2.Dock = System.Windows.Forms.DockStyle.Fill;
             this.splitContainer2.Location = new System.Drawing.Point(0, 0);
             this.splitContainer2.Name = "splitContainer2";
-            this.splitContainer2.Orientation = System.Windows.Forms.Orientation.Horizontal;
+            this.splitContainer2.FixedPanel = System.Windows.Forms.FixedPanel.Panel2;
             // 
             // splitContainer2.Panel1
             // 
@@ -1921,8 +1997,14 @@ namespace TabularEditor
             // splitContainer2.Panel2
             // 
             this.splitContainer2.Panel2.Controls.Add(this.propertyGrid1);
-            this.splitContainer2.Size = new System.Drawing.Size(658, 569);
-            this.splitContainer2.SplitterDistance = 273;
+            this.splitContainer2.Panel2.Controls.Add(this.lblPropertyContext);
+            this.splitContainer2.Panel2.Controls.Add(this.lblPropertyObject);
+            this.splitContainer2.Panel2.Controls.Add(this.toolPropertiesPane);
+            this.splitContainer2.Size = new System.Drawing.Size(789, 569);
+            this.splitContainer2.SplitterDistance = 513;
+            this.splitContainer2.Panel1MinSize = 230;
+            this.splitContainer2.Panel2MinSize = 185;
+            this.splitContainer2.SplitterWidth = 6;
             this.splitContainer2.TabIndex = 15;
             // 
             // tabCodeEditors
@@ -2463,6 +2545,8 @@ namespace TabularEditor
             // viewToolStripMenuItem
             // 
             this.viewToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.menuPropertiesPane,
+            new System.Windows.Forms.ToolStripSeparator(),
             this.mEasToolStripMenuItem,
             this.xToolStripMenuItem,
             this.yToolStripMenuItem,
@@ -2652,6 +2736,7 @@ namespace TabularEditor
             this.AutoScaleDimensions = new System.Drawing.SizeF(96F, 96F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Dpi;
             this.ClientSize = new System.Drawing.Size(1067, 640);
+            this.MinimumSize = new System.Drawing.Size(690, 390);
             this.Controls.Add(this.splitContainer1);
             this.Controls.Add(this.toolStrip2);
             this.Controls.Add(this.statusStrip1);
@@ -2667,6 +2752,8 @@ namespace TabularEditor
             ((System.ComponentModel.ISupportInitialize)(actionsMain)).EndInit();
             this.toolStrip2.ResumeLayout(false);
             this.toolStrip2.PerformLayout();
+            this.toolModelSearch.ResumeLayout(false);
+            this.toolModelSearch.PerformLayout();
             this.splitContainer1.Panel1.ResumeLayout(false);
             this.splitContainer1.Panel1.PerformLayout();
             this.splitContainer1.Panel2.ResumeLayout(false);
@@ -2703,13 +2790,21 @@ namespace TabularEditor
         private System.Windows.Forms.ToolStripButton btnSave;
         private System.Windows.Forms.ToolStripSeparator toolStripSeparator3;
         private System.Windows.Forms.ToolStripButton btnConnect;
-        private System.Windows.Forms.ToolStripSeparator toolStripSeparator4;
         private System.Windows.Forms.ToolStripLabel toolStripLabel1;
         private System.Windows.Forms.ToolStripComboBox cmbPerspective;
         private System.Windows.Forms.ToolStripSeparator toolStripSeparator5;
         private System.Windows.Forms.ToolStripLabel toolStripLabel2;
         private System.Windows.Forms.ToolStripComboBox cmbTranslation;
         private System.Windows.Forms.SplitContainer splitContainer1;
+        private System.Windows.Forms.ToolStrip toolModelSearch;
+        private System.Windows.Forms.Label lblModelPane;
+        private System.Windows.Forms.ToolStrip toolPropertiesPane;
+        private System.Windows.Forms.ToolStripLabel lblPropertiesPane;
+        private System.Windows.Forms.ToolStripDropDownButton btnPropertyOrder;
+        private System.Windows.Forms.Label lblPropertyObject;
+        private System.Windows.Forms.Label lblPropertyContext;
+        private System.Windows.Forms.ToolStripButton btnPropertiesPane;
+        private System.Windows.Forms.ToolStripMenuItem menuPropertiesPane;
         private TabularEditor.PropertyGridExtension.NavigatablePropertyGrid propertyGrid1;
         private System.Windows.Forms.StatusStrip statusStrip1;
         private System.Windows.Forms.ToolStripStatusLabel lblStatus;

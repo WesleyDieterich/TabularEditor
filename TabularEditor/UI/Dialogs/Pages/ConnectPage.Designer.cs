@@ -211,8 +211,7 @@ namespace TabularEditor.UI.Dialogs.Pages
             this.txtServer.Size = new System.Drawing.Size(453, 24);
             this.txtServer.TabIndex = 0;
             this.txtServer.SelectionChangeCommitted += new System.EventHandler(this.txtServer_SelectionChangeCommitted);
-            this.txtServer.TextUpdate += new System.EventHandler(this.ValidateUI);
-            this.txtServer.KeyPress += new System.Windows.Forms.KeyPressEventHandler(this.txtServer_KeyPress);
+            this.txtServer.TextUpdate += new System.EventHandler(this.txtServer_TextUpdate);
             // 
             // ConnectPage
             // 
