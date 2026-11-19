@@ -370,7 +370,7 @@ namespace TabularEditor.UI
 
         private void UpdateUIText()
         {
-            var appName = $"{ Application.ProductName } { Application.ProductVersion }";
+            const string appName = "Tabular Editor";
 
             if (Handler == null)
             {

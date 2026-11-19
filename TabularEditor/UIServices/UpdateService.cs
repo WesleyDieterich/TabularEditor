@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
+using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -11,10 +12,12 @@ namespace TabularEditor.UIServices
 {
     public static class UpdateService
     {
-        public const string VERSION_MANIFEST_URL = "https://raw.githubusercontent.com/TabularEditor/TabularEditor/master/TabularEditor/version.txt";
-        public const string DOWNLOAD_UPDATE_URL = "https://github.com/TabularEditor/TabularEditor/releases/latest";
+        public const string VERSION_MANIFEST_URL = "https://raw.githubusercontent.com/WesleyDieterich/TabularEditor/master/TabularEditor/version.txt";
+        public const string DOWNLOAD_UPDATE_URL = "https://github.com/WesleyDieterich/TabularEditor/releases/latest";
 
-        public static Version CurrentBuild { get; } = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
+        public static Version CurrentBuild { get; } = typeof(UpdateService).Assembly.GetName().Version;
+        public static string CurrentVersion { get; } = typeof(UpdateService).Assembly
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? CurrentBuild.ToString();
         public static Version AvailableBuild { get; private set; } = null;
         public static VersionCheckResult AvailableVersion { get; private set; } = VersionCheckResult.NoNewVersion;
 

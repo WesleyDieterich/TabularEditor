@@ -12,7 +12,7 @@
         2. Sign TOMWrapper.dll first, then TabularEditor.exe last.
         3. Build the installer (.vdproj) with devenv.com. MSBuild cannot build
            Visual Studio deployment projects.
-        4. Extract the MSI payload with an administrative install and verify that
+        4. Extract the MSI payload from its embedded cabinet and verify that
            the TabularEditor.exe inside the MSI is still signed.
         5. Zip the extracted payload into the portable archive.
         6. Sign the MSI as the final step and copy it to its published names.
@@ -163,7 +163,7 @@ function Invoke-Native {
     #>
     param(
         [Parameter(Mandatory)] [string]   $FilePath,
-        [Parameter(Mandatory)] [string[]] $Arguments,
+        [Parameter(Mandatory)] [AllowEmptyCollection()] [string[]] $Arguments,
         [string] $ErrorMessage = 'Command failed'
     )
     Write-Verbose "$FilePath $($Arguments -join ' ')"
@@ -555,14 +555,9 @@ $payloadDir = Join-Path $InstallerOutDir '_payload'
 if (Test-Path $payloadDir) { Remove-Item $payloadDir -Recurse -Force }
 New-Item -ItemType Directory -Path $payloadDir | Out-Null
 
-# An administrative install unpacks the MSI without installing it, giving the exact file
-# set a user receives. This replaces the old manual "install, then zip Program Files".
-$msiexec = Start-Process -FilePath 'msiexec.exe' `
-    -ArgumentList @('/a', "`"$rawMsi`"", '/qn', "TARGETDIR=`"$payloadDir`"") `
-    -Wait -PassThru
-if ($msiexec.ExitCode -ne 0) {
-    throw "Administrative install of $RawMsiName failed with exit code $($msiexec.ExitCode)."
-}
+# Read the package tables and cabinet directly. An administrative installation can
+# ignore TARGETDIR under Windows Installer policy and write to the installed application.
+& (Join-Path $RepoRoot 'Scripts\Extract-MsiPayload.ps1') -MsiPath $rawMsi -Destination $payloadDir
 
 $payloadExe = Join-Path $payloadDir 'TabularEditor.exe'
 if (-not (Test-Path $payloadExe)) { throw "The extracted MSI payload does not contain TabularEditor.exe." }

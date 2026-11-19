@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 using TabularEditor.TOMWrapper;
 
@@ -11,6 +12,7 @@ namespace TabularEditor.UI
     internal sealed class DaxQueryTabs : UserControl
     {
         private readonly Func<TabularModelHandler> getHandler;
+        private readonly bool previewOnly;
         private readonly List<QueryTab> tabs = new List<QueryTab>();
         private readonly Panel bar = new Panel { Dock = DockStyle.Top, Height = 31 };
         private readonly FlowLayoutPanel strip = new FlowLayoutPanel
@@ -18,23 +20,28 @@ namespace TabularEditor.UI
             Dock = DockStyle.Fill, WrapContents = false, AutoScroll = true
         };
         private readonly Panel content = new Panel { Dock = DockStyle.Fill };
-        private readonly Button addButton = HeaderButton("+", "New query");
+        private readonly Button addButton;
         private readonly ToolTip toolTip = new ToolTip();
         private readonly ContextMenuStrip queryMenu = new ContextMenuStrip();
         private QueryTab menuTab;
         private QueryTab active;
         private int nextNumber = 1;
 
-        public DaxQueryTabs(Func<TabularModelHandler> getHandler)
+        public DaxQueryTabs(Func<TabularModelHandler> getHandler, bool previewOnly = false)
         {
             this.getHandler = getHandler;
+            this.previewOnly = previewOnly;
             Dock = DockStyle.Fill;
-            addButton.Margin = new Padding(2, 2, 0, 0);
-            addButton.FlatAppearance.BorderSize = 0;
-            addButton.Paint += PaintSeparator;
-            addButton.Click += (sender, args) => AddTab();
-            toolTip.SetToolTip(addButton, "New query");
-            strip.Controls.Add(addButton);
+            if (!previewOnly)
+            {
+                addButton = HeaderButton("+", "New query");
+                addButton.Margin = new Padding(2, 2, 0, 0);
+                addButton.FlatAppearance.BorderSize = 0;
+                addButton.Paint += PaintSeparator;
+                addButton.Click += (sender, args) => AddTab();
+                toolTip.SetToolTip(addButton, "New query");
+                strip.Controls.Add(addButton);
+            }
             bar.Controls.Add(strip);
             Controls.Add(content);
             Controls.Add(bar);
@@ -45,14 +52,16 @@ namespace TabularEditor.UI
                 queryMenu.Dispose();
             };
             ConfigureQueryMenu();
-            AddTab();
+            if (!previewOnly) AddTab();
+            else bar.Hide();
         }
 
         public DaxQueryEditor ActiveEditor => active?.Editor;
+        public event EventHandler Emptied;
 
         public void SaveActiveScript()
         {
-            if (active != null) SaveTab(active);
+            if (!previewOnly && active != null) SaveTab(active);
         }
 
         public void CloseActiveTab()
@@ -65,7 +74,7 @@ namespace TabularEditor.UI
             BackColor = bar.BackColor = strip.BackColor = AppTheme.IsDark ? AppTheme.Surface : SystemColors.Control;
             AppTheme.ApplyToolTip(toolTip);
             AppTheme.ApplyContextMenu(queryMenu);
-            StyleButton(addButton);
+            if (addButton != null) StyleButton(addButton);
             foreach (var tab in tabs)
             {
                 StyleTab(tab);
@@ -75,28 +84,53 @@ namespace TabularEditor.UI
 
         public void ClearResults()
         {
+            if (previewOnly)
+            {
+                RemoveTabs(tabs.ToArray(), null, 0);
+                return;
+            }
             foreach (var tab in tabs) tab.Editor.ClearResults();
         }
 
-        private void AddTab()
+        public Task OpenPreviewAsync(Table table)
         {
-            var tab = new QueryTab(new DaxQueryEditor(getHandler), $"Query {nextNumber++}");
+            var existing = tabs.FirstOrDefault(tab => ReferenceEquals(tab.SourceTable, table));
+            if (existing != null)
+            {
+                SelectTab(existing);
+                return Task.CompletedTask;
+            }
+
+            var editor = new DaxQueryEditor(getHandler,
+                () => table.IsRemoved ? null : $"EVALUATE TOPN({DaxQueryEditor.PreviewRowLimit}, {table.DaxObjectFullName})");
+            AddTab(new QueryTab(editor, table.Name, table));
+            return editor.ExecuteAsync();
+        }
+
+        private void AddTab() => AddTab(new QueryTab(new DaxQueryEditor(getHandler), $"Query {nextNumber++}"));
+
+        private void AddTab(QueryTab tab)
+        {
             tabs.Add(tab);
+            if (previewOnly) bar.Show();
             tab.Editor.Visible = false;
             content.Controls.Add(tab.Editor);
             tab.Editor.ApplyTheme();
             strip.Controls.Add(tab.Header);
-            strip.Controls.SetChildIndex(addButton, strip.Controls.Count - 1);
+            if (addButton != null) strip.Controls.SetChildIndex(addButton, strip.Controls.Count - 1);
             tab.Header.ContextMenuStrip = queryMenu;
             foreach (Control button in tab.Header.Controls) button.ContextMenuStrip = queryMenu;
             tab.Title.Click += (sender, args) => SelectTab(tab);
-            tab.DirtyIndicator.Click += (sender, args) => SelectTab(tab);
-            tab.Editor.ScriptChanged += (sender, args) => UpdateDirtyIndicator(tab);
-            tab.Title.DoubleClick += (sender, args) => RenameTab(tab);
+            if (!previewOnly)
+            {
+                tab.DirtyIndicator.Click += (sender, args) => SelectTab(tab);
+                tab.Editor.ScriptChanged += (sender, args) => UpdateDirtyIndicator(tab);
+                tab.Title.DoubleClick += (sender, args) => RenameTab(tab);
+                toolTip.SetToolTip(tab.Title, "Double-click to rename");
+            }
             tab.Pin.Click += (sender, args) => TogglePin(tab);
             tab.Close.Click += (sender, args) => CloseTab(tab);
-            toolTip.SetToolTip(tab.Title, "Double-click to rename");
-            toolTip.SetToolTip(tab.Close, "Close query");
+            toolTip.SetToolTip(tab.Close, previewOnly ? "Close preview" : "Close query");
             Point? dragStart = null;
             tab.Title.MouseDown += (sender, args) =>
             {
@@ -124,20 +158,24 @@ namespace TabularEditor.UI
             };
             SelectTab(tab);
             SizeTabStrip();
-            strip.ScrollControlIntoView(addButton);
+            if (addButton != null) strip.ScrollControlIntoView(addButton);
         }
 
         private void ConfigureQueryMenu()
         {
             var pin = queryMenu.Items.Add("Pin", null, (sender, args) => TogglePin(menuTab));
-            queryMenu.Items.Add("Save…", null, (sender, args) => SaveTab(menuTab));
-            queryMenu.Items.Add("Rename…", null, (sender, args) => RenameTab(menuTab));
+            if (!previewOnly)
+            {
+                queryMenu.Items.Add("Save…", null, (sender, args) => SaveTab(menuTab));
+                queryMenu.Items.Add("Rename…", null, (sender, args) => RenameTab(menuTab));
+            }
             queryMenu.Items.Add(new ToolStripSeparator());
             queryMenu.Items.Add("Close tab", null, (sender, args) => CloseTab(menuTab));
             var closeOthers = queryMenu.Items.Add("Close all other tabs", null, (sender, args) =>
-                CloseMany(tabs.Where(tab => tab != menuTab).ToArray(), menuTab, "Close all other query tabs?"));
+                CloseMany(tabs.Where(tab => tab != menuTab).ToArray(), menuTab,
+                    previewOnly ? "Close all other preview tabs?" : "Close all other query tabs?"));
             queryMenu.Items.Add("Close all tabs", null, (sender, args) =>
-                CloseMany(tabs.ToArray(), null, "Close all query tabs?"));
+                CloseMany(tabs.ToArray(), null, previewOnly ? "Close all preview tabs?" : "Close all query tabs?"));
             queryMenu.Opening += (sender, args) =>
             {
                 var source = queryMenu.SourceControl;
@@ -195,7 +233,7 @@ namespace TabularEditor.UI
         private void CloseTab(QueryTab tab)
         {
             var index = tabs.IndexOf(tab);
-            if (!tab.IsSaved && MessageBox.Show(this, $"Close “{tab.Title.Text}” without saving?",
+            if (!previewOnly && !tab.IsSaved && MessageBox.Show(this, $"Close “{tab.Title.Text}” without saving?",
                 "Close query", MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2) != DialogResult.Yes)
                 return;
             RemoveTabs(new[] { tab }, active == tab ? null : active, index);
@@ -204,7 +242,7 @@ namespace TabularEditor.UI
         private void CloseMany(QueryTab[] closing, QueryTab keep, string prompt)
         {
             if (closing.Length == 0) return;
-            if (closing.Any(tab => !tab.IsSaved))
+            if (!previewOnly && closing.Any(tab => !tab.IsSaved))
                 prompt += "\r\n\r\nUnsaved scripts will be lost.";
             if (MessageBox.Show(this, prompt, "Close queries", MessageBoxButtons.YesNo,
                 MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2) == DialogResult.Yes)
@@ -220,9 +258,14 @@ namespace TabularEditor.UI
                 tab.Editor.Dispose();
                 tab.Header.Dispose();
             }
-            if (tabs.Count == 0) AddTab();
+            if (tabs.Count == 0)
+            {
+                if (previewOnly) bar.Hide();
+                else AddTab();
+            }
             else SelectTab(keep ?? tabs[Math.Min(index, tabs.Count - 1)]);
             SizeTabStrip();
+            if (previewOnly && tabs.Count == 0) Emptied?.Invoke(this, EventArgs.Empty);
         }
 
         private void SaveTab(QueryTab tab)
@@ -332,7 +375,7 @@ namespace TabularEditor.UI
         {
             if (strip.Width < 1) return;
             var needsScroll = tabs.Sum(tab => tab.Header.Width + tab.Header.Margin.Horizontal) +
-                addButton.Width + addButton.Margin.Horizontal > strip.Width;
+                (addButton == null ? 0 : addButton.Width + addButton.Margin.Horizontal) > strip.Width;
             bar.Height = 31 + (needsScroll ? SystemInformation.HorizontalScrollBarHeight : 0);
         }
 
@@ -343,7 +386,7 @@ namespace TabularEditor.UI
             StyleButton(tab.Pin, selected);
             StyleButton(tab.Close, selected);
             StyleDirtyIndicator(tab.DirtyIndicator, selected);
-            UpdateDirtyIndicator(tab);
+            if (!previewOnly) UpdateDirtyIndicator(tab);
             tab.Pin.ForeColor = tab.Pinned && AppTheme.IsDark ? AppTheme.Accent : tab.Title.ForeColor;
             tab.Pin.AccessibleName = tab.Pinned ? "Unpin query" : "Pin query";
             tab.Pin.Invalidate();
@@ -419,6 +462,7 @@ namespace TabularEditor.UI
         private sealed class QueryTab
         {
             public readonly DaxQueryEditor Editor;
+            public readonly Table SourceTable;
             public readonly FlowLayoutPanel Header = CreateTabHeader();
             public readonly Button Title;
             public readonly Label DirtyIndicator = CreateDirtyIndicator();
@@ -431,9 +475,10 @@ namespace TabularEditor.UI
                 !string.Equals(Title.Text, Path.GetFileNameWithoutExtension(SavedPath), StringComparison.Ordinal);
             public bool IsSaved => SavedPath != null && !HasPendingRename && Editor.ScriptText == SavedScript;
 
-            public QueryTab(DaxQueryEditor editor, string name)
+            public QueryTab(DaxQueryEditor editor, string name, Table sourceTable = null)
             {
                 Editor = editor;
+                SourceTable = sourceTable;
                 Title = CreateTabTitle(name);
                 Header.Controls.Add(Title);
                 Header.Controls.Add(DirtyIndicator);

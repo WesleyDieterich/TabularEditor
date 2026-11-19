@@ -33,9 +33,10 @@ namespace TabularEditor.UI
         internal static bool IsDark => Preferences.Current.UseDarkTheme && !SystemInformation.HighContrast;
 
         private static readonly ConditionalWeakTable<Form, ThemeState> Themes = new ConditionalWeakTable<Form, ThemeState>();
-        private static readonly ConditionalWeakTable<DaxQueryEditor, ThemeState> QueryThemes =
-            new ConditionalWeakTable<DaxQueryEditor, ThemeState>();
+        private static readonly ConditionalWeakTable<Control, ThemeState> WorkspaceThemes =
+            new ConditionalWeakTable<Control, ThemeState>();
         private static readonly ToolStripRenderer Renderer = new DarkRenderer();
+        private static readonly ToolStripRenderer LightMenuRenderer = new ToolStripProfessionalRenderer();
         private static readonly ToolStripRenderer CompletionRenderer = new AutocompleteRenderer();
         private static readonly ConditionalWeakTable<TextStyle, Brush> LightBrushes = new ConditionalWeakTable<TextStyle, Brush>();
 
@@ -141,28 +142,30 @@ namespace TabularEditor.UI
             }
         }
 
-        internal static void ApplyQueryEditor(DaxQueryEditor editor)
+        internal static void ApplyWorkspaceControl(Control control)
         {
             if (IsDark)
-                QueryThemes.GetValue(editor, query =>
+                WorkspaceThemes.GetValue(control, workspace =>
                 {
                     var state = new ThemeState();
-                    state.Apply(query);
+                    state.Apply(workspace);
                     return state;
                 });
-            else if (QueryThemes.TryGetValue(editor, out var previous))
+            else if (WorkspaceThemes.TryGetValue(control, out var previous))
             {
                 previous.Restore();
-                QueryThemes.Remove(editor);
+                WorkspaceThemes.Remove(control);
             }
         }
 
-        internal static void ApplyContextMenu(ContextMenuStrip menu)
+        internal static void ApplyContextMenu(ToolStripDropDown menu)
         {
-            if (IsDark) menu.Renderer = Renderer;
-            else menu.RenderMode = ToolStripRenderMode.ManagerRenderMode;
-            menu.BackColor = IsDark ? Surface : SystemColors.Control;
-            menu.ForeColor = IsDark ? Text : SystemColors.ControlText;
+            var dark = IsDark;
+            menu.Renderer = dark ? Renderer : LightMenuRenderer;
+            menu.BackColor = dark ? Surface : SystemColors.Menu;
+            menu.ForeColor = dark ? Text : SystemColors.MenuText;
+            foreach (var item in menu.Items.OfType<ToolStripDropDownItem>())
+                if (item.HasDropDownItems) ApplyContextMenu(item.DropDown);
         }
 
         private static void UpdateTitleBar(object sender, EventArgs e)
@@ -184,6 +187,7 @@ namespace TabularEditor.UI
         [DllImport("uxtheme.dll", CharSet = CharSet.Unicode)]
         private static extern int SetWindowTheme(IntPtr hwnd, string applicationName, string idList);
 
+
         internal static void ApplyToolTip(ToolTip tip)
         {
             if (tip == null) return;
@@ -193,6 +197,7 @@ namespace TabularEditor.UI
             tip.OwnerDraw = IsDark;
             if (IsDark) tip.Draw += DrawToolTip;
         }
+
 
         private static void DrawToolTip(object sender, DrawToolTipEventArgs e)
         {
@@ -227,7 +232,7 @@ namespace TabularEditor.UI
                     ApplyNestedScrollBars(control);
                 else
                     foreach (Control child in control.Controls)
-                        if (!(child is DaxQueryEditor)) Apply(child);
+                        if (!(child is DaxQueryEditor) && !(child is RefreshHistory)) Apply(child);
                 if (control is ToolStrip hostedStrip)
                 {
                     foreach (var host in hostedStrip.Items.OfType<ToolStripControlHost>()) Apply(host.Control);

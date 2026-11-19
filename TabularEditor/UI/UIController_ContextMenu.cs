@@ -166,6 +166,7 @@ namespace TabularEditor.UI
 
             // Remove unnescessary separators:
             RemoveSeparators(menu);
+            AppTheme.ApplyContextMenu(menu);
         }
 
         private void RemoveSeparators(ToolStripDropDown menu)
@@ -235,6 +236,7 @@ namespace TabularEditor.UI
                 item.Click += ContextMenuItem_Click;
             }
             
+            AppTheme.ApplyContextMenu(menu.DropDown);
             state.IsLoaded = true;
         }
 

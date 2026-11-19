@@ -24,6 +24,11 @@ namespace TabularEditor
         private DaxQueryTabs daxQueryTabs;
         private DaxQueryEditor daxQueryEditor => daxQueryTabs?.ActiveEditor;
         private TabPage pgDaxScript;
+        private DaxQueryTabs exploreDataTabs;
+        private TabPage pgExploreData;
+        private RefreshHistory refreshHistory;
+        private TabPage pgRefreshHistory;
+        private bool showExpressionProperties;
         private FormWindowState lastVisibleWindowState = FormWindowState.Maximized;
 
         public static FormMain Singleton;
@@ -48,6 +53,7 @@ namespace TabularEditor
             tabCodeEditors.TabPages.Add(pgDaxScript);
             ((ThemedTabControl)tabCodeEditors).UseEditorTabStyle();
             UI.ModelLoaded += (sender, args) => daxQueryTabs.ClearResults();
+            UI.ModelLoaded += (sender, args) => exploreDataTabs?.ClearResults();
             txtFilter.Control.SetCueBanner("Search model");
 
             ///// Populate macros and samples /////
@@ -144,8 +150,91 @@ Selected.Hierarchies.ForEach(item => item.TranslatedDisplayFolders.SetAll(item.D
         private void ApplyWorkspaceTheme()
         {
             AppTheme.Apply(this);
+            AppTheme.ApplyContextMenu(tvModel.ContextMenuStrip);
             UI.ApplyEditorTheme();
             daxQueryTabs.ApplyTheme();
+            exploreDataTabs?.ApplyTheme();
+            if (refreshHistory != null) AppTheme.ApplyWorkspaceControl(refreshHistory);
+        }
+
+        internal void PreviewTableData(Table table)
+        {
+            if (UI.Handler?.IsConnected != true || table.IsRemoved) return;
+            if (pgExploreData == null)
+            {
+                exploreDataTabs = new DaxQueryTabs(() => UI.Handler, previewOnly: true);
+                pgExploreData = new TabPage("Explore Data");
+                pgExploreData.Controls.Add(exploreDataTabs);
+                exploreDataTabs.Emptied += (sender, args) =>
+                {
+                    var page = pgExploreData;
+                    pgExploreData = null;
+                    exploreDataTabs = null;
+                    RemoveWorkspacePage(page);
+                };
+                tabCodeEditors.TabPages.Insert(tabCodeEditors.TabPages.IndexOf(pgDaxScript) + 1, pgExploreData);
+                exploreDataTabs.ApplyTheme();
+            }
+            tabCodeEditors.SelectedTab = pgExploreData;
+            _ = exploreDataTabs.OpenPreviewAsync(table);
+        }
+
+        internal void RefreshModelData(TabularNamedObject target, RefreshType mode)
+        {
+            var handler = UI.Handler;
+            if (handler?.IsConnected != true || target.IsRemoved) return;
+            var model = handler.Database.Name;
+            var targetName = target is Model ? "Entire model" : target.Name;
+            if (mode == RefreshType.ClearValues &&
+                AppMessageBox.Show(this, $"Clear the data for {targetName} in “{model}” and its dependents?",
+                    "Clear Values", MessageBoxButtons.YesNo, MessageBoxIcon.Warning,
+                    MessageBoxDefaultButton.Button2) != DialogResult.Yes)
+                return;
+
+            string connection;
+            string command;
+            try
+            {
+                connection = handler.GetQueryConnectionString(model);
+                command = TOMWrapper.Utils.Scripter.ScriptRefresh(new[] { target }, mode);
+            }
+            catch (Exception error)
+            {
+                AppMessageBox.Show(this, error.Message, "Could not start refresh", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            _ = ShowRefreshHistory().RunAsync(model, targetName, mode, () => TOMWrapper.Database.ExecuteRefresh(connection, command));
+        }
+
+        private RefreshHistory ShowRefreshHistory()
+        {
+            if (pgRefreshHistory == null)
+            {
+                refreshHistory = new RefreshHistory();
+                pgRefreshHistory = new TabPage("Refresh History");
+                pgRefreshHistory.Controls.Add(refreshHistory);
+                refreshHistory.Emptied += (sender, args) =>
+                {
+                    var page = pgRefreshHistory;
+                    pgRefreshHistory = null;
+                    refreshHistory = null;
+                    RemoveWorkspacePage(page);
+                };
+                tabCodeEditors.TabPages.Add(pgRefreshHistory);
+                AppTheme.ApplyWorkspaceControl(refreshHistory);
+            }
+
+            tabCodeEditors.SelectedTab = pgRefreshHistory;
+            return refreshHistory;
+        }
+
+        private void RemoveWorkspacePage(TabPage page)
+        {
+            if (tabCodeEditors.SelectedTab == page)
+                tabCodeEditors.SelectedTab = pgExploreData ?? pgDaxScript;
+            tabCodeEditors.TabPages.Remove(page);
+            page.Dispose();
         }
 
         private void StyleWorkspace()
@@ -320,18 +409,30 @@ Selected.Hierarchies.ForEach(item => item.TranslatedDisplayFolders.SetAll(item.D
                 if (namedSelection != null) namedSelection.PropertyChanged -= SelectedNameChanged;
             };
             propertyGrid1.PropertySortChanged += (sender, args) => UpdatePropertyOrder();
+            showExpressionProperties = !splitContainer2.Panel2Collapsed;
+            tabCodeEditors.SelectedIndexChanged += (sender, args) => UpdatePropertiesPaneVisibility();
             UpdatePropertyContext();
             UpdatePropertyOrder();
+            UpdatePropertiesPaneVisibility();
         }
 
         private void TogglePropertiesPane(object sender, EventArgs e)
         {
-            if (!splitContainer2.Panel2Collapsed && propertyGrid1.ContainsFocus)
+            if (tabCodeEditors.SelectedTab != pgExpressionEditor) return;
+            showExpressionProperties = !showExpressionProperties;
+            UpdatePropertiesPaneVisibility();
+        }
+
+        private void UpdatePropertiesPaneVisibility()
+        {
+            var inExpressionEditor = tabCodeEditors.SelectedTab == pgExpressionEditor;
+            var show = inExpressionEditor && showExpressionProperties;
+            if (!show && splitContainer2.Panel2.ContainsFocus)
                 tvModel.Focus();
 
-            splitContainer2.Panel2Collapsed = !splitContainer2.Panel2Collapsed;
-            btnPropertiesPane.Checked = !splitContainer2.Panel2Collapsed;
-            menuPropertiesPane.Checked = btnPropertiesPane.Checked;
+            splitContainer2.Panel2Collapsed = !show;
+            btnPropertiesPane.Available = menuPropertiesPane.Available = inExpressionEditor;
+            btnPropertiesPane.Checked = menuPropertiesPane.Checked = show;
         }
 
         private sealed class WorkspaceColors : ProfessionalColorTable
@@ -1109,6 +1210,8 @@ Selected.Hierarchies.ForEach(item => item.TranslatedDisplayFolders.SetAll(item.D
             {
                 if (tabCodeEditors.SelectedTab == pgExpressionEditor) UI.CloseActiveExpressionTab();
                 else if (tabCodeEditors.SelectedTab == pgDaxScript) daxQueryTabs.CloseActiveTab();
+                else if (pgExploreData != null && tabCodeEditors.SelectedTab == pgExploreData) exploreDataTabs.CloseActiveTab();
+                else if (pgRefreshHistory != null && tabCodeEditors.SelectedTab == pgRefreshHistory) refreshHistory.CloseSelected();
                 else return base.ProcessCmdKey(ref msg, keyData);
                 return true;
             }

@@ -16,9 +16,12 @@ namespace TabularEditor.UI.Extensions
         [DllImport("user32.dll", CharSet = CharSet.Auto)]
         private static extern Int32 SendMessage(IntPtr hWnd, int msg, int wParam, [MarshalAs(UnmanagedType.LPWStr)] string lParam);
 
-        public static void SetCueBanner(this Control control, string cueBannerText)
+        public static void SetCueBanner(this Control control, string cueBannerText) =>
+            control.SetCueBanner(cueBannerText, false);
+
+        public static void SetCueBanner(this Control control, string cueBannerText, bool showWhileFocused)
         {
-            SendMessage(control.Handle, EM_SETCUEBANNER, 0, cueBannerText);
+            SendMessage(control.Handle, EM_SETCUEBANNER, showWhileFocused ? 1 : 0, cueBannerText);
         }
     }
 }

@@ -301,7 +301,9 @@
     <Compile Include="TextServices\ExpressionParser.cs" />
     <Compile Include="UI\DaxIntelliSense.cs" />
     <Compile Include="UI\DaxQueryEditor.cs" />
+    <Compile Include="UI\FilterCalendar.cs" />
     <Compile Include="UI\DaxQueryTabs.cs" />
+    <Compile Include="UI\RefreshHistory.cs" />
     <Compile Include="UI\DaxQueryWorkbook.cs" />
     <Compile Include="UI\AppTheme.cs" />
     <Compile Include="UI\AppMessageBox.cs" />

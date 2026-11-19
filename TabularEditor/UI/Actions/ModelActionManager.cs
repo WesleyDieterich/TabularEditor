@@ -58,6 +58,21 @@ namespace TabularEditor.UI.Actions
         {
             var csDialog = new CultureSelectDialog();
 
+            Add(new Action((s, m) => Handler.IsConnected && s.DirectCount == 1 && s.Direct.FirstOrDefault() is Table,
+                (s, m) => FormMain.Singleton.PreviewTableData(s.Table), (s, m) => "Preview Data",
+                false, Context.Table | Context.CalculationGroupTable));
+
+            foreach (var refreshType in new[] { RefreshType.Full, RefreshType.Calculate, RefreshType.DataOnly,
+                RefreshType.Automatic, RefreshType.Defragment, RefreshType.ClearValues })
+            {
+                Add(new Action(
+                    (s, m) => Handler.IsConnected && s.DirectCount == 1 &&
+                        (s.Direct.FirstOrDefault() is Model || s.Direct.FirstOrDefault() is Table),
+                    (s, m) => FormMain.Singleton.RefreshModelData((TabularNamedObject)s.Direct.First(), refreshType),
+                    (s, m) => @"Refresh Data\" + RefreshHistory.ModeName(refreshType),
+                    true, Context.Model | Context.Table | Context.CalculationGroupTable));
+            }
+
             // Import Table Wizard...:
             Add(new Action((s, m) => Governance.AllowCreate(typeof(Table)), (s, m) => ImportTablesWizard.ShowWizard(m), (s, m) => "Import Tables...", true, Context.Model | Context.Tables));
             Add(new Action((s, m) => Governance.AllowCreate(typeof(DataColumn)) && m.DataSources.Any(ds => ds.Type == DataSourceType.Provider), (s, m) => ScriptHelper.SchemaCheck(m), (s, m) => "Refresh Table Metadata...", true, Context.Model | Context.Tables));

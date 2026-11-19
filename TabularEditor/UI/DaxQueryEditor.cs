@@ -21,6 +21,7 @@ namespace TabularEditor.UI
     internal sealed class DaxQueryEditor : UserControl
     {
         private readonly Func<TabularModelHandler> getHandler;
+        private readonly Func<string> previewQuery;
         private readonly CodeEditor editor;
         private readonly DaxIntelliSense intelliSense;
         private readonly SplitContainer split;
@@ -54,42 +55,51 @@ namespace TabularEditor.UI
         private TimeSpan executionTime;
         private Form filterPopup;
 
-        public DaxQueryEditor(Func<TabularModelHandler> getHandler)
+        public DaxQueryEditor(Func<TabularModelHandler> getHandler, Func<string> previewQuery = null)
         {
             this.getHandler = getHandler;
+            this.previewQuery = previewQuery;
             Dock = DockStyle.Fill;
             split = new SplitContainer
             {
                 Dock = DockStyle.Fill, Orientation = Orientation.Horizontal, SplitterWidth = 6,
                 Size = new Size(640, 450), Panel1MinSize = 60, Panel2MinSize = 60, Panel2Collapsed = true
             };
-            var codeFont = FormMain.CreateWorkspaceFont("Cascadia Mono", "Consolas", 9.75f);
-            editor = new CodeEditor
+            Font codeFont = null;
+            if (previewQuery == null)
             {
-                Dock = DockStyle.Fill, BorderStyle = BorderStyle.None, AutoIndent = true,
-                AutoIndentExistingLines = false, AutoIndentChars = false,
-                Font = codeFont
-            };
-            intelliSense = new DaxIntelliSense(editor, () => true, () => getHandler()?.Model, queryEditor: true);
-            highlight.Tick += (sender, args) =>
-            {
-                highlight.Stop();
-                if (editor.IsHandleCreated) ExpressionParser.SyntaxHighlight(editor);
-            };
-            editor.TextChanged += (sender, args) => ScheduleHighlight();
-            editor.TextChanged += (sender, args) => ScriptChanged?.Invoke(this, EventArgs.Empty);
-            editor.VisibleChanged += (sender, args) => { if (editor.Visible) ScheduleHighlight(); };
-            editor.Text = "EVALUATE\r\n";
+                codeFont = FormMain.CreateWorkspaceFont("Cascadia Mono", "Consolas", 9.75f);
+                editor = new CodeEditor
+                {
+                    Dock = DockStyle.Fill, BorderStyle = BorderStyle.None, AutoIndent = true,
+                    AutoIndentExistingLines = false, AutoIndentChars = false,
+                    Font = codeFont
+                };
+                intelliSense = new DaxIntelliSense(editor, () => true, () => getHandler()?.Model, queryEditor: true);
+                highlight.Tick += (sender, args) =>
+                {
+                    highlight.Stop();
+                    if (editor.IsHandleCreated) ExpressionParser.SyntaxHighlight(editor);
+                };
+                editor.TextChanged += (sender, args) => ScheduleHighlight();
+                editor.TextChanged += (sender, args) => ScriptChanged?.Invoke(this, EventArgs.Empty);
+                editor.VisibleChanged += (sender, args) => { if (editor.Visible) ScheduleHighlight(); };
+                editor.Text = "EVALUATE\r\n";
+            }
 
             var commands = new ToolStrip { GripStyle = ToolStripGripStyle.Hidden };
-            runButton = new ToolStripButton("Run (F5)", Resources.Run, async (sender, args) => await ExecuteAsync())
+            runButton = new ToolStripButton(previewQuery == null ? "Run (F5)" : "Refresh", Resources.Run,
+                async (sender, args) => await ExecuteAsync())
             {
                 ImageTransparentColor = Color.Magenta
             };
             cancelButton = new ToolStripButton("Cancel", null, (sender, args) => CancelExecution()) { Enabled = false };
-            commands.Items.Add(runButton);
-            commands.Items.Add(cancelButton);
-            split.Panel1.Controls.Add(editor);
+            if (previewQuery == null)
+            {
+                commands.Items.Add(runButton);
+                commands.Items.Add(cancelButton);
+                split.Panel1.Controls.Add(editor);
+            }
             split.Panel1.Controls.Add(commands);
             collapsedResultsCommands = new ToolStrip
             {
@@ -144,16 +154,24 @@ namespace TabularEditor.UI
             {
                 Margin = new Padding(4, 1, 8, 1), Enabled = false
             };
+            if (previewQuery != null)
+            {
+                resultCommands.Items.Add(runButton);
+                resultCommands.Items.Add(cancelButton);
+                split.Panel2Collapsed = false;
+                split.Panel1Collapsed = true;
+            }
             resultCommands.Items.Add(exportControl);
             resultCommands.Items.Add(resultSelector);
             resultCommands.Items.Add(rowCount);
-            resultCommands.Items.Add(ResultsArrow(false, "Hide results", (sender, args) =>
+            if (previewQuery == null) resultCommands.Items.Add(ResultsArrow(false, "Hide results", (sender, args) =>
             {
                 split.Panel2Collapsed = true;
                 collapsedResultsCommands.Show();
             }));
             split.Panel2.Controls.Add(grid);
-            split.Panel2.Controls.Add(new Panel { Dock = DockStyle.Top, Height = split.SplitterWidth });
+            if (previewQuery == null)
+                split.Panel2.Controls.Add(new Panel { Dock = DockStyle.Top, Height = split.SplitterWidth });
             split.Panel2.Controls.Add(resultCommands);
             split.Panel2.Controls.Add(typeToolTip);
             typeToolTip.BringToFront();
@@ -167,17 +185,17 @@ namespace TabularEditor.UI
                 highlight.Dispose();
                 typeIconFont.Dispose();
                 results?.Dispose();
-                codeFont.Dispose();
+                codeFont?.Dispose();
             };
         }
 
         public void ApplyTheme()
         {
-            AppTheme.ApplyQueryEditor(this);
-            intelliSense.ApplyTheme();
+            AppTheme.ApplyWorkspaceControl(this);
+            intelliSense?.ApplyTheme();
             typeToolTip.BackColor = AppTheme.IsDark ? AppTheme.Raised : SystemColors.Info;
             typeToolTip.ForeColor = AppTheme.IsDark ? AppTheme.Text : SystemColors.InfoText;
-            ScheduleHighlight();
+            if (editor != null) ScheduleHighlight();
         }
 
         public void Find() => editor.ShowFindDialog();
@@ -203,7 +221,7 @@ namespace TabularEditor.UI
             executionTimer.Stop();
             ResetResults();
             collapsedResultsCommands.Hide();
-            split.Panel2Collapsed = true;
+            if (previewQuery == null) split.Panel2Collapsed = true;
         }
 
         private void ResetResults()
@@ -239,8 +257,14 @@ namespace TabularEditor.UI
                 return;
             }
 
-            var query = QueryText;
-            if (Preferences.Current.UseSemicolonsAsSeparators) query = ExpressionParser.SemicolonsToCommas(query);
+            var query = previewQuery == null ? QueryText : previewQuery();
+            if (query == null)
+            {
+                rowCount.Text = "This table is no longer available.";
+                return;
+            }
+            if (previewQuery == null && Preferences.Current.UseSemicolonsAsSeparators)
+                query = ExpressionParser.SemicolonsToCommas(query);
             var lexer = new DAXLexer(new DAXCharStream(query, false));
             lexer.RemoveErrorListeners();
             var firstToken = lexer.GetDefaultTokens().FirstOrDefault()?.Text;
@@ -252,11 +276,11 @@ namespace TabularEditor.UI
                 return;
             }
 
-            intelliSense.Close();
+            intelliSense?.Close();
             var catalog = handler.Database.Name;
             var connectionString = handler.GetQueryConnectionString(catalog);
             ResetResults();
-            ShowResultsPane();
+            if (previewQuery == null) ShowResultsPane();
             var cancellation = runningQuery = new CancellationTokenSource();
             runButton.Enabled = false;
             cancelButton.Enabled = true;
@@ -268,7 +292,16 @@ namespace TabularEditor.UI
             Exception failure = null;
             try
             {
-                data = await Task.Run(() => Database.ExecuteDax(connectionString, catalog, query, cancellation.Token));
+                data = await Task.Run(() =>
+                {
+                    var result = Database.ExecuteDax(connectionString, catalog, query, cancellation.Token);
+                    if (previewQuery != null && result.Tables.Count > 0)
+                    {
+                        var rows = result.Tables[0].Rows;
+                        while (rows.Count > PreviewRowLimit) rows.RemoveAt(rows.Count - 1);
+                    }
+                    return result;
+                });
             }
             catch (Exception error)
             {
@@ -360,6 +393,8 @@ namespace TabularEditor.UI
             else rowCount.Text = "No result sets";
         }
 
+        internal const int PreviewRowLimit = 1000;
+
         private void ShowResultsPane()
         {
             collapsedResultsCommands.Hide();
@@ -444,7 +479,8 @@ namespace TabularEditor.UI
                 };
                 var format = ResultFormat(column);
                 column.ExtendedProperties["DaxFormat"] = format;
-                gridColumn.DefaultCellStyle.Format = DisplayFormat(format);
+                var displayFormat = DisplayFormat(format);
+                gridColumn.DefaultCellStyle.Format = IsDate(columnType) ? NormalizeModelDateFormat(displayFormat) : displayFormat;
                 gridColumn.DefaultCellStyle.Alignment = IsNumeric(column)
                     ? DataGridViewContentAlignment.MiddleRight
                     : DataGridViewContentAlignment.MiddleLeft;
@@ -519,10 +555,45 @@ namespace TabularEditor.UI
             }
         }
 
+        private static readonly Regex DateFormatTokens = new Regex(
+            @"'[^']*'|""[^""]*""|\\.|AM/PM|AMPM|([a-zA-Z])\1*|.", RegexOptions.CultureInvariant);
+
+        private static string NormalizeModelDateFormat(string format)
+        {
+            if (format.Length <= 1) return format;
+            var time = false;
+            return DateFormatTokens.Replace(format, match =>
+            {
+                var token = match.Value;
+                switch (token[0])
+                {
+                    case 'H':
+                    case 'h':
+                    case 's':
+                        time = true;
+                        break;
+                    case 'd':
+                    case 'y':
+                    case 'M':
+                        time = false;
+                        break;
+                    case 'n':
+                        return new string('m', token.Length);
+                    case 'm':
+                        return time ? token : token.ToUpperInvariant();
+                }
+                return token == "AM/PM" || token == "AMPM" ? "tt" : token;
+            });
+        }
+
         private string ResultFormat(DataColumn column)
         {
             var model = getHandler()?.Model;
             if (model == null) return string.Empty;
+            var source = model.Tables.SelectMany(t => t.Columns)
+                .FirstOrDefault(c => c.DaxObjectFullName == column.ColumnName ||
+                    c.Table.Name + "[" + c.Name.Replace("]", "]]") + "]" == column.ColumnName);
+            if (source != null) return source.FormatString ?? string.Empty;
             var name = DaxQueryWorkbook.ColumnName(column.ColumnName);
             var measureName = name;
             // Named expressions such as "Receita", [Valor Receita] retain the measure's format.
@@ -532,11 +603,7 @@ namespace TabularEditor.UI
                 if (alias.Groups["alias"].Value.Replace("\"\"", "\"") == name)
                     measureName = alias.Groups["measure"].Value.Replace("]]", "]");
             var measure = model.Tables.SelectMany(t => t.Measures).FirstOrDefault(m => m.Name == measureName);
-            if (measure != null) return measure.FormatString ?? string.Empty;
-            var source = model.Tables.SelectMany(t => t.Columns)
-                .FirstOrDefault(c => c.DaxObjectFullName == column.ColumnName ||
-                    c.Table.Name + "[" + c.Name.Replace("]", "]]") + "]" == column.ColumnName);
-            return source?.FormatString ?? string.Empty;
+            return measure?.FormatString ?? string.Empty;
         }
 
         private Rectangle FilterButton(Rectangle header) =>
@@ -635,50 +702,59 @@ namespace TabularEditor.UI
             }
             filterPopup?.Close();
 
+            var style = grid.Columns[column].DefaultCellStyle;
+            var culture = (CultureInfo)style.FormatProvider;
             var values = table.Rows.Cast<DataRow>().Select(row => row[column]).Distinct()
-                .Select(value => new FilterValue(value)).OrderBy(value => value.Label, StringComparer.CurrentCultureIgnoreCase).ToArray();
+                .Select(value => new FilterValue(value, style.Format, culture))
+                .OrderBy(value => value.Label, StringComparer.CurrentCultureIgnoreCase).ToArray();
             filters.TryGetValue(column, out var previous);
             var selected = previous == null ? new HashSet<object>(values.Select(value => value.Value)) : new HashSet<object>(previous);
+            conditions.TryGetValue(column, out var currentCondition);
             var search = new TextBox { Dock = DockStyle.Top, AccessibleName = "Search filter values" };
-            search.SetCueBanner("Search values");
-            var list = new DataGridView
+            search.SetCueBanner("Search…", showWhileFocused: true);
+            var list = new CheckedListBox
             {
-                Dock = DockStyle.Fill, AllowUserToAddRows = false, AllowUserToDeleteRows = false,
-                AllowUserToResizeRows = false, RowHeadersVisible = false, ColumnHeadersVisible = false,
-                BorderStyle = BorderStyle.None, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
-                SelectionMode = DataGridViewSelectionMode.FullRowSelect, BackgroundColor = SystemColors.Window
+                Dock = DockStyle.Fill, CheckOnClick = true, IntegralHeight = false,
+                BorderStyle = BorderStyle.None, AccessibleName = "Filter values"
             };
-            list.Columns.Add(new DataGridViewCheckBoxColumn { Width = 28, AutoSizeMode = DataGridViewAutoSizeColumnMode.None });
-            list.Columns.Add(new DataGridViewTextBoxColumn { ReadOnly = true });
-            list.CurrentCellDirtyStateChanged += (s, e) =>
-            {
-                if (list.IsCurrentCellDirty) list.CommitEdit(DataGridViewDataErrorContexts.Commit);
-            };
+            var all = new CheckBox { Text = "(Select all)", Dock = DockStyle.Top, AutoCheck = false, ThreeState = true };
             var numeric = IsNumeric(table.Columns[column]);
-            var textColumn = table.Columns[column].DataType == typeof(string);
+            var type = GetResultType(table.Columns[column]);
+            var dateColumn = IsDate(type);
             var mode = new ComboBox { Dock = DockStyle.Top, DropDownStyle = ComboBoxStyle.DropDownList };
             mode.Items.Add("Basic");
-            if (numeric || textColumn) mode.Items.Add(numeric ? "Advanced" : "Text filter");
-            var operation = new ComboBox { Dock = DockStyle.Top, DropDownStyle = ComboBoxStyle.DropDownList };
-            operation.Items.AddRange(numeric
-                ? new object[] { "Equals", "Does not equal", "Greater than", "Greater than or equal", "Less than", "Less than or equal" }
-                : new object[] { "Contains", "Equals", "Does not contain", "Does not equal", "Starts with", "Ends with" });
-            var operand = new TextBox { Dock = DockStyle.Top, AccessibleName = "Filter value" };
-            operand.SetCueBanner("Filter value");
-            var validation = new Label { Dock = DockStyle.Top, AutoSize = true, ForeColor = Color.Firebrick };
-            var basic = new Panel { Dock = DockStyle.Fill };
+            if (numeric || dateColumn || type == typeof(string)) mode.Items.Add("Advanced");
+            var operation = new ComboBox { Dock = DockStyle.Fill, DropDownStyle = ComboBoxStyle.DropDownList };
+            if (dateColumn)
+                operation.Items.AddRange(new object[] { "On", "Before", "After", "On or before", "On or after", "Between" });
+            else if (numeric)
+                operation.Items.AddRange(new object[] { "Equals", "Does not equal", "Greater than", "Greater than or equal", "Less than", "Less than or equal" });
+            else
+                operation.Items.AddRange(new object[] { "Contains", "Equals", "Does not contain", "Does not equal", "Starts with", "Ends with" });
+            var operand = dateColumn ? null : new TextBox { Dock = DockStyle.Fill, AccessibleName = "Filter value" };
+            operand?.SetCueBanner("Filter…", showWhileFocused: true);
+            var startDate = dateColumn ? new FilterDateField(culture, style.Format, "Filter date") : null;
+            var endDate = dateColumn ? new FilterDateField(culture, style.Format, "End date") : null;
+            var calendar = dateColumn ? new FilterCalendar(culture) : null;
+            FilterDateField calendarTarget = null;
+            var validation = new Label { Dock = DockStyle.Fill, AutoSize = true };
+            var basic = new Panel { Dock = DockStyle.Fill, Padding = new Padding(0, 6, 0, 0) };
             basic.Controls.Add(list);
+            basic.Controls.Add(all);
             basic.Controls.Add(search);
-            var advanced = new Panel { Dock = DockStyle.Fill };
-            advanced.Controls.Add(validation);
-            advanced.Controls.Add(operand);
+            var advanced = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, Padding = new Padding(0, 3, 0, 0) };
+            advanced.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             advanced.Controls.Add(operation);
-            var buttons = new FlowLayoutPanel { Dock = DockStyle.Bottom, AutoSize = true };
-            var all = new Button { Text = "Select all", AutoSize = true };
-            var none = new Button { Text = "Clear", AutoSize = true };
+            advanced.Controls.Add(dateColumn ? (Control)startDate : operand);
+            if (endDate != null) advanced.Controls.Add(endDate);
+            if (calendar != null) advanced.Controls.Add(calendar);
+            advanced.Controls.Add(validation);
+            var buttons = new FlowLayoutPanel { Dock = DockStyle.Bottom, AutoSize = true, FlowDirection = FlowDirection.RightToLeft };
             var apply = new Button { Text = "Apply", AutoSize = true };
-            buttons.Controls.AddRange(new Control[] { all, none, apply });
-            var panel = new Panel { Size = new Size(260, 270), Padding = new Padding(6) };
+            var cancel = new Button { Text = "Cancel", AutoSize = true };
+            var clear = new Button { Text = "Clear filter", AutoSize = true, Visible = previous != null || currentCondition != null };
+            buttons.Controls.AddRange(new Control[] { apply, cancel, clear });
+            var panel = new Panel { Dock = DockStyle.Fill, Padding = new Padding(8) };
             panel.Controls.Add(basic);
             panel.Controls.Add(advanced);
             panel.Controls.Add(mode);
@@ -689,13 +765,12 @@ namespace TabularEditor.UI
                 FormBorderStyle = FormBorderStyle.None,
                 StartPosition = FormStartPosition.Manual,
                 ShowInTaskbar = false,
-                ClientSize = new Size(360, 270),
+                ClientSize = new Size(270, 275),
                 MinimizeBox = false,
                 MaximizeBox = false,
                 AutoScaleMode = AutoScaleMode.Dpi
             };
             filterPopup = popup;
-            panel.Dock = DockStyle.Fill;
             popup.Controls.Add(panel);
             popup.Deactivate += (s, e) => popup.Close();
             popup.Paint += (s, e) =>
@@ -708,98 +783,200 @@ namespace TabularEditor.UI
             {
                 if (ReferenceEquals(filterPopup, popup)) filterPopup = null;
             };
-            var cancel = new Button { Text = "Cancel", AutoSize = true };
-            buttons.Controls.Add(cancel);
             cancel.Click += (s, e) => popup.Close();
             popup.CancelButton = cancel;
             popup.AcceptButton = apply;
-            panel.Width = 360;
+            var position = grid.PointToScreen(new Point(button.Left, header.Bottom));
+            var area = Screen.FromControl(grid).WorkingArea;
+            void PositionPopup()
+            {
+                popup.Location = new Point(
+                    Math.Max(area.Left, Math.Min(position.X, area.Right - popup.Width)),
+                    Math.Max(area.Top, Math.Min(position.Y, area.Bottom - popup.Height)));
+            }
 
             bool refreshing = false;
+            bool basicChanged = false;
+            void UpdateSelectAll()
+            {
+                var checkedCount = list.Items.Cast<FilterValue>().Count(value => selected.Contains(value.Value));
+                all.Enabled = list.Items.Count != 0;
+                all.CheckState = checkedCount == 0 ? CheckState.Unchecked
+                    : checkedCount == list.Items.Count ? CheckState.Checked : CheckState.Indeterminate;
+            }
+
             void RefreshValues()
             {
                 refreshing = true;
-                list.Rows.Clear();
-                foreach (var value in values)
-                    if (value.Label.IndexOf(search.Text, StringComparison.CurrentCultureIgnoreCase) >= 0)
-                    {
-                        var index = list.Rows.Add(selected.Contains(value.Value), value.Label);
-                        list.Rows[index].Tag = value.Value;
-                    }
+                list.BeginUpdate();
+                list.Items.Clear();
+                foreach (var value in values.Where(value => value.Label.IndexOf(search.Text, StringComparison.CurrentCultureIgnoreCase) >= 0))
+                    list.Items.Add(value, selected.Contains(value.Value));
+                list.EndUpdate();
                 refreshing = false;
+                UpdateSelectAll();
             }
 
-            list.CellValueChanged += (s, e) =>
+            list.ItemCheck += (s, e) =>
             {
-                if (refreshing || e.RowIndex < 0 || e.ColumnIndex != 0) return;
-                var row = list.Rows[e.RowIndex];
-                var value = row.Tag;
-                if (Convert.ToBoolean(row.Cells[0].Value)) selected.Add(value);
+                if (refreshing) return;
+                var value = ((FilterValue)list.Items[e.Index]).Value;
+                if (e.NewValue == CheckState.Checked) selected.Add(value);
                 else selected.Remove(value);
+                basicChanged = true;
+                UpdateSelectAll();
             };
             all.Click += (s, e) =>
             {
-                selected.UnionWith(values.Select(value => value.Value));
-                RefreshValues();
-            };
-            none.Click += (s, e) =>
-            {
-                selected.Clear();
+                var matching = list.Items.Cast<FilterValue>().Select(value => value.Value);
+                if (all.CheckState == CheckState.Checked) selected.ExceptWith(matching);
+                else selected.UnionWith(matching);
+                basicChanged = true;
                 RefreshValues();
             };
             search.TextChanged += (s, e) => RefreshValues();
-            conditions.TryGetValue(column, out var currentCondition);
             operation.SelectedIndex = 0;
             if (currentCondition != null)
             {
                 operation.SelectedItem = currentCondition.Operation;
-                operand.Text = currentCondition.Text;
+                if (dateColumn)
+                {
+                    startDate.Input.Text = currentCondition.Text;
+                    endDate.Input.Text = currentCondition.UpperText;
+                }
+                else operand.Text = currentCondition.Text;
+            }
+            void SetFilterLayout()
+            {
+                var isBasic = mode.SelectedIndex == 0;
+                basic.Visible = isBasic;
+                advanced.Visible = !isBasic;
+                var between = dateColumn && operation.Text == "Between";
+                if (endDate != null) endDate.Visible = between;
+                if (calendar != null) calendar.Visible = !isBasic && calendarTarget != null;
+                var height = (int)Math.Round((isBasic ? 275 : between ? 188 : 160) * popup.DeviceDpi / 96.0);
+                if (!isBasic && calendarTarget != null)
+                    height += calendar.Height + calendar.Margin.Vertical - (int)Math.Round(14 * popup.DeviceDpi / 96.0);
+                popup.ClientSize = new Size(popup.ClientSize.Width, height);
+                PositionPopup();
+                validation.Text = "";
+            }
+            void ToggleCalendar(FilterDateField field)
+            {
+                calendarTarget = calendarTarget == field ? null : field;
+                if (calendarTarget != null)
+                    calendar.ShowDate(field.TryRead(out var value) ? value : (DateTime?)null);
+                SetFilterLayout();
+            }
+            if (dateColumn)
+            {
+                startDate.CalendarButton.Click += (s, e) => ToggleCalendar(startDate);
+                endDate.CalendarButton.Click += (s, e) => ToggleCalendar(endDate);
+                calendar.DateChosen += date =>
+                {
+                    var field = calendarTarget;
+                    if (field == null) return;
+                    if (date.HasValue) field.SetDate(date.Value);
+                    else field.Input.Clear();
+                    calendarTarget = null;
+                    SetFilterLayout();
+                    field.Input.Focus();
+                };
             }
             mode.SelectedIndexChanged += (s, e) =>
             {
-                basic.Visible = mode.SelectedIndex == 0;
-                advanced.Visible = mode.SelectedIndex != 0;
-                all.Visible = none.Visible = mode.SelectedIndex == 0;
+                calendarTarget = null;
+                SetFilterLayout();
+                if (popup.Visible)
+                {
+                    if (mode.SelectedIndex == 0) search.Focus();
+                    else operation.Focus();
+                }
             };
-            mode.SelectedIndex = currentCondition != null || textColumn && previous == null ? 1 : 0;
+            operation.SelectedIndexChanged += (s, e) =>
+            {
+                calendarTarget = null;
+                SetFilterLayout();
+            };
+            mode.SelectedIndex = 0;
+            clear.Click += (s, e) =>
+            {
+                filters.Remove(column);
+                conditions.Remove(column);
+                ApplyFilters();
+                popup.Close();
+            };
             apply.Click += (s, e) =>
             {
                 if (mode.SelectedIndex == 0)
                 {
+                    if (currentCondition != null && !basicChanged)
+                    {
+                        popup.Close();
+                        return;
+                    }
                     conditions.Remove(column);
                     if (selected.Count == values.Length) filters.Remove(column);
                     else filters[column] = selected;
                 }
                 else
                 {
-                    var culture = (CultureInfo)grid.Columns[column].DefaultCellStyle.FormatProvider;
+                    var filterText = dateColumn ? startDate.Input.Text : operand.Text;
+                    var between = dateColumn && operation.Text == "Between";
+                    var hasValue = dateColumn ? startDate.HasInput || (between && endDate.HasInput) : filterText.Length > 0;
                     decimal number = 0;
-                    if (numeric && operand.Text.Length > 0 && !decimal.TryParse(operand.Text, NumberStyles.Number | NumberStyles.AllowExponent, culture, out number))
+                    if (numeric && hasValue && !decimal.TryParse(filterText, NumberStyles.Number | NumberStyles.AllowExponent, culture, out number))
                     {
                         validation.Text = "Enter a valid number.";
                         operand.Focus();
                         return;
                     }
+                    DateTime? date = null;
+                    DateTime? upperDate = null;
+                    if (dateColumn && hasValue)
+                    {
+                        if (!startDate.TryRead(out var parsedDate))
+                        {
+                            calendarTarget = null;
+                            SetFilterLayout();
+                            validation.Text = "Enter a valid date.";
+                            startDate.Input.Focus();
+                            return;
+                        }
+                        date = parsedDate.Date;
+                        if (between)
+                        {
+                            if (!endDate.TryRead(out var parsedUpperDate) || parsedUpperDate.Date < date)
+                            {
+                                calendarTarget = null;
+                                SetFilterLayout();
+                                validation.Text = "Enter an end date on or after the start date.";
+                                endDate.Input.Focus();
+                                return;
+                            }
+                            upperDate = parsedUpperDate.Date;
+                        }
+                    }
                     filters.Remove(column);
-                    if (operand.Text.Length == 0) conditions.Remove(column);
-                    else conditions[column] = new ColumnCondition(operation.Text, operand.Text, numeric, number, culture);
+                    if (!hasValue) conditions.Remove(column);
+                    else conditions[column] = new ColumnCondition(operation.Text, filterText, numeric, number, culture,
+                        date, upperDate, between ? endDate.Input.Text : "");
                 }
                 ApplyFilters();
                 popup.Close();
             };
             RefreshValues();
             AppTheme.Apply(popup);
-            var position = grid.PointToScreen(new Point(button.Left, header.Bottom));
-            var area = Screen.FromControl(grid).WorkingArea;
-            popup.Location = new Point(
-                Math.Max(area.Left, Math.Min(position.X, area.Right - popup.Width)),
-                Math.Max(area.Top, Math.Min(position.Y, area.Bottom - popup.Height)));
+            calendar?.ApplyPalette();
+            validation.ForeColor = AppTheme.IsDark ? Color.LightSalmon : Color.Firebrick;
+            PositionPopup();
             // Let the grid finish handling the mouse press before activating the filter.
             BeginInvoke((MethodInvoker)(() =>
             {
                 if (popup.IsDisposed || IsDisposed) return;
                 popup.Show(FindForm());
                 if (mode.SelectedIndex == 0) search.Focus();
+                else if (dateColumn) startDate.Input.Focus();
                 else operand.Focus();
             }));
         }
@@ -826,11 +1003,17 @@ namespace TabularEditor.UI
             public object Value { get; }
             public string Label { get; }
 
-            public FilterValue(object value)
+            public FilterValue(object value, string format, CultureInfo culture)
             {
                 Value = value;
-                Label = value == DBNull.Value || value is string text && text.Length == 0
-                    ? "(Blank)" : Convert.ToString(value);
+                if (value == DBNull.Value || value is string text && text.Length == 0)
+                    Label = "(Blank)";
+                else if (IsDate(value.GetType()) && value is IFormattable date)
+                {
+                    try { Label = date.ToString(format, culture); }
+                    catch (FormatException) { Label = date.ToString(null, culture); }
+                }
+                else Label = Convert.ToString(value);
             }
 
             public override string ToString() => Label;
@@ -869,9 +1052,11 @@ namespace TabularEditor.UI
             return type ?? typeof(object);
         }
 
+        private static bool IsDate(Type type) => type == typeof(DateTime) || type == typeof(DateTimeOffset);
+
         private static string GetTypeIcon(Type type)
         {
-            if (type == typeof(DateTime) || type == typeof(DateTimeOffset)) return "▦";
+            if (IsDate(type)) return "▦";
             if (type == typeof(TimeSpan)) return "◷";
             if (type == typeof(bool)) return "✓";
             if (type == typeof(string) || type == typeof(char)) return "abc";
@@ -901,26 +1086,153 @@ namespace TabularEditor.UI
                 type == typeof(double) || type == typeof(decimal);
         }
 
+        private sealed class FilterDateField : Panel
+        {
+            private readonly CultureInfo culture;
+            private readonly string pattern;
+            public readonly MaskedTextBox Input;
+            public readonly Button CalendarButton;
+
+            public FilterDateField(CultureInfo culture, string displayFormat, string label)
+            {
+                this.culture = culture;
+                pattern = DateInputPattern(displayFormat, culture);
+                var mask = "";
+                if (Regex.IsMatch(pattern, @"\A[dMy./ -]+\z") &&
+                    !pattern.Contains("ddd") && !pattern.Contains("MMM"))
+                {
+                    // A mask requires a fixed number of digits for the day and month.
+                    pattern = Regex.Replace(pattern, @"d+|M+|y+", token =>
+                        token.Value[0] == 'y' ? token.Value.Length == 2 ? "yy" : "yyyy" : new string(token.Value[0], 2));
+                    mask = string.Concat(pattern.Select(character => char.IsLetter(character) ? "0"
+                        : character == '/' ? string.Concat(culture.DateTimeFormat.DateSeparator.Select(separator => "\\" + separator))
+                        : "\\" + character));
+                }
+
+                Dock = DockStyle.Fill;
+                Height = 25;
+                Input = new MaskedTextBox
+                {
+                    Mask = mask, Culture = culture, TextMaskFormat = MaskFormat.IncludeLiterals,
+                    Dock = DockStyle.Fill, AccessibleName = $"{label} ({pattern})"
+                };
+                if (mask.Length == 0) Input.SetCueBanner(DateTime.Today.ToString(pattern, culture), showWhileFocused: true);
+                CalendarButton = new Button
+                {
+                    Dock = DockStyle.Right, Width = 28, FlatStyle = FlatStyle.Flat, UseVisualStyleBackColor = false,
+                    AccessibleName = $"Choose {label.ToLowerInvariant()} from the calendar"
+                };
+                CalendarButton.Paint += PaintCalendarIcon;
+                Controls.Add(Input);
+                Controls.Add(CalendarButton);
+            }
+
+            private static string DateInputPattern(string format, CultureInfo culture)
+            {
+                switch (format)
+                {
+                    case "D":
+                    case "f":
+                    case "F": return culture.DateTimeFormat.LongDatePattern;
+                    case "s":
+                    case "o":
+                    case "O":
+                    case "u": return "yyyy-MM-dd";
+                }
+
+                if (format.Length > 1)
+                {
+                    var tokens = DateFormatTokens.Matches(format).Cast<Match>().ToArray();
+                    var dateTokens = tokens.Where(token => "dMy".Contains(token.Value[0])).ToArray();
+                    if (dateTokens.Any(token => token.Value == "d" || token.Value == "dd") &&
+                        dateTokens.Any(token => token.Value[0] == 'M') &&
+                        dateTokens.Any(token => token.Value[0] == 'y'))
+                    {
+                        var start = dateTokens[0].Index;
+                        var last = dateTokens[dateTokens.Length - 1];
+                        var date = format.Substring(start, last.Index + last.Length - start);
+                        if (!tokens.Any(token => token.Index >= start && token.Index <= last.Index &&
+                            "HhmstfFKz".Contains(token.Value[0])))
+                            return date;
+                    }
+                }
+                return culture.DateTimeFormat.ShortDatePattern;
+            }
+
+            public bool HasInput => Input.Mask.Length == 0 ? !string.IsNullOrWhiteSpace(Input.Text)
+                : Input.MaskedTextProvider.AssignedEditPositionCount > 0;
+
+            public bool TryRead(out DateTime date)
+            {
+                date = default;
+                return (Input.Mask.Length == 0 || Input.MaskCompleted) &&
+                    DateTime.TryParseExact(Input.Text, pattern, culture, DateTimeStyles.AllowWhiteSpaces, out date);
+            }
+
+            public void SetDate(DateTime date) => Input.Text = date.ToString(pattern, culture);
+
+            private void PaintCalendarIcon(object sender, PaintEventArgs args)
+            {
+                var scale = CalendarButton.DeviceDpi / 96.0;
+                var size = (int)Math.Round(12 * scale);
+                var x = (CalendarButton.Width - size) / 2;
+                var y = (CalendarButton.Height - size) / 2;
+                var line = Math.Max(1, size / 4);
+                using (var pen = new Pen(CalendarButton.ForeColor))
+                {
+                    args.Graphics.DrawRectangle(pen, x, y + 1, size, size - 1);
+                    args.Graphics.DrawLine(pen, x, y + line + 1, x + size, y + line + 1);
+                    args.Graphics.DrawLine(pen, x + line, y - 1, x + line, y + 2);
+                    args.Graphics.DrawLine(pen, x + size - line, y - 1, x + size - line, y + 2);
+                }
+            }
+        }
+
         private sealed class ColumnCondition
         {
             public string Operation { get; }
             public string Text { get; }
+            public string UpperText { get; }
             private readonly bool numeric;
             private readonly decimal number;
             private readonly CultureInfo culture;
+            private readonly DateTime? date;
+            private readonly DateTime? upperDate;
 
-            public ColumnCondition(string operation, string text, bool numeric, decimal number, CultureInfo culture)
+            public ColumnCondition(string operation, string text, bool numeric, decimal number, CultureInfo culture,
+                DateTime? date, DateTime? upperDate, string upperText)
             {
                 Operation = operation;
                 Text = text;
+                UpperText = upperText;
                 this.numeric = numeric;
                 this.number = number;
                 this.culture = culture;
+                this.date = date;
+                this.upperDate = upperDate;
             }
 
             public bool Matches(object value)
             {
                 if (value == DBNull.Value) return false;
+                if (date.HasValue)
+                {
+                    DateTime day;
+                    if (value is DateTime timestamp) day = timestamp.Date;
+                    else if (value is DateTimeOffset withOffset) day = withOffset.Date;
+                    else return false;
+
+                    switch (Operation)
+                    {
+                        case "On": return day == date.Value;
+                        case "Before": return day < date.Value;
+                        case "After": return day > date.Value;
+                        case "On or before": return day <= date.Value;
+                        case "On or after": return day >= date.Value;
+                        case "Between": return day >= date.Value && day <= upperDate.Value;
+                        default: return false;
+                    }
+                }
                 if (numeric)
                 {
                     if (!decimal.TryParse(Convert.ToString(value, CultureInfo.InvariantCulture),

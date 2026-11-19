@@ -116,7 +116,7 @@ namespace TabularEditor.UI.Dialogs
 
         private void PreferencesForm_Load(object sender, EventArgs e)
         {
-            lblCurrentVersion.Text = "Current Version: " + UpdateService.CurrentBuild;
+            lblCurrentVersion.Text = "Current Version: " + UpdateService.CurrentVersion;
         }
 
         private bool tmpProxyUseSystem;

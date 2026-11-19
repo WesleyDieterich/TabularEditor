@@ -70,6 +70,23 @@ namespace TabularEditor.TOMWrapper
             }
         }
 
+        internal static string ExecuteRefresh(string connectionString, string tmsl)
+        {
+            using (var server = new TOM.Server())
+            {
+                server.Connect(connectionString, propertiesOnly: true);
+                var results = server.Execute(new XElement("Statement", tmsl).ToString());
+                if (results == null) return string.Empty;
+
+                var messages = string.Join(Environment.NewLine, results.Cast<XmlaResult>()
+                    .SelectMany(result => result.Messages.OfType<XmlaMessage>())
+                    .Select(message => message.Description).Where(description => !string.IsNullOrWhiteSpace(description)));
+                if (results.ContainsErrors)
+                    throw new InvalidOperationException(string.IsNullOrEmpty(messages) ? "The server reported a refresh error." : messages);
+                return messages;
+            }
+        }
+
         /// <summary>
         /// Executes the specified DAX query against the connected database and returns an AmoDataReader object that enumerates the result
         /// </summary>

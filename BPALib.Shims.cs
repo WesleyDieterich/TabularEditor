@@ -166,7 +166,7 @@ namespace TabularEditor.UIServices
 {
     internal static class UpdateService
     {
-        public const string VERSION_MANIFEST_URL = "https://raw.githubusercontent.com/TabularEditor/TabularEditor/master/TabularEditor/version.txt";
+        public const string VERSION_MANIFEST_URL = "https://raw.githubusercontent.com/WesleyDieterich/TabularEditor/master/TabularEditor/version.txt";
     }
 
     internal class Preferences
