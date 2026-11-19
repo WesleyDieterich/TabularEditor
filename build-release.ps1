@@ -545,6 +545,10 @@ Remove-Item $buildLog -Force -ErrorAction SilentlyContinue
 
 Write-Ok "Built $RawMsiName"
 
+# Visual Studio uses TARGETDIR for the application folder. Keep the selected path
+# when Windows Installer hands execution to its elevated service.
+& (Join-Path $RepoRoot 'Scripts\Set-MsiInstallDirectory.ps1') -MsiPath $rawMsi
+
 # --------------------------------------------------------------------------------------
 # 4. Extract the MSI payload and verify the signature survived
 # --------------------------------------------------------------------------------------
