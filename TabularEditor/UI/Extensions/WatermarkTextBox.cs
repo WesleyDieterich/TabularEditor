@@ -12,6 +12,7 @@ namespace TabularEditor.UI.Extensions
     {
         private const int EM_SETCUEBANNER = 0x1501;
         private const int EM_GETCUEBANNER = 0x1502;
+        private const int CB_SETCUEBANNER = 0x1703;
 
         [DllImport("user32.dll", CharSet = CharSet.Auto)]
         private static extern Int32 SendMessage(IntPtr hWnd, int msg, int wParam, [MarshalAs(UnmanagedType.LPWStr)] string lParam);
@@ -21,7 +22,9 @@ namespace TabularEditor.UI.Extensions
 
         public static void SetCueBanner(this Control control, string cueBannerText, bool showWhileFocused)
         {
-            SendMessage(control.Handle, EM_SETCUEBANNER, showWhileFocused ? 1 : 0, cueBannerText);
+            var isComboBox = control is ComboBox;
+            SendMessage(control.Handle, isComboBox ? CB_SETCUEBANNER : EM_SETCUEBANNER,
+                !isComboBox && showWhileFocused ? 1 : 0, cueBannerText);
         }
     }
 }

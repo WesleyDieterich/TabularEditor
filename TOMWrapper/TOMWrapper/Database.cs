@@ -1,4 +1,5 @@
 using Microsoft.AnalysisServices;
+using Microsoft.AnalysisServices.AdomdClient;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -134,20 +135,29 @@ namespace TabularEditor.TOMWrapper
                 return ReadDaxResults(reader);
         }
 
-        internal static DataSet ExecuteDax(string connectionString, string catalog, string dax, CancellationToken cancellation)
+        internal static DataSet ExecuteDax(string connectionString, string dax, CancellationToken cancellation)
         {
             cancellation.ThrowIfCancellationRequested();
             // The query owns its session so model editing can continue while it runs.
-            using (var server = new TOM.Server())
+            using (var connection = new AdomdConnection(connectionString))
+            using (var command = new AdomdCommand(dax, connection))
+            using (var adapter = new AdomdDataAdapter(command))
             {
-                server.Connect(connectionString, propertiesOnly: true);
-                using (cancellation.Register(server.CancelCommand))
+                connection.Open();
+                using (cancellation.Register(command.Cancel))
                 {
                     cancellation.ThrowIfCancellationRequested();
-                    using (var reader = ExecuteDaxReader(server, catalog, dax))
+                    var dataSet = new DataSet();
+                    try
                     {
+                        adapter.Fill(dataSet);
                         cancellation.ThrowIfCancellationRequested();
-                        return ReadDaxResults(reader);
+                        return dataSet;
+                    }
+                    catch
+                    {
+                        dataSet.Dispose();
+                        throw;
                     }
                 }
             }

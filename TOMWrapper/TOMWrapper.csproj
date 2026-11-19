@@ -48,6 +48,10 @@
       <HintPath>..\packages\Microsoft.AnalysisServices.19.117.0\lib\net472\Microsoft.AnalysisServices.dll</HintPath>
       <Private>True</Private>
     </Reference>
+    <Reference Include="Microsoft.AnalysisServices.AdomdClient, Version=19.117.0.0, Culture=neutral, PublicKeyToken=89845dcd8080cc91">
+      <HintPath>..\packages\Microsoft.AnalysisServices.AdomdClient.19.117.0\lib\net472\Microsoft.AnalysisServices.AdomdClient.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
     <Reference Include="Microsoft.AnalysisServices.Core, Version=19.117.0.0, Culture=neutral, PublicKeyToken=89845dcd8080cc91">
       <HintPath>..\packages\Microsoft.AnalysisServices.19.117.0\lib\net472\Microsoft.AnalysisServices.Core.dll</HintPath>
       <Private>True</Private>

@@ -24,6 +24,8 @@ namespace TabularEditor
         private DaxQueryTabs daxQueryTabs;
         private DaxQueryEditor daxQueryEditor => daxQueryTabs?.ActiveEditor;
         private TabPage pgDaxScript;
+        private readonly PivotView pivotView;
+        private readonly TabPage pgPivot;
         private DaxQueryTabs exploreDataTabs;
         private TabPage pgExploreData;
         private RefreshHistory refreshHistory;
@@ -51,6 +53,11 @@ namespace TabularEditor
             pgDaxScript = new TabPage("DAX Query");
             pgDaxScript.Controls.Add(daxQueryTabs);
             tabCodeEditors.TabPages.Add(pgDaxScript);
+            pivotView = new PivotView(() => UI.Handler);
+            pgPivot = new TabPage("Pivot Table");
+            pgPivot.Controls.Add(pivotView);
+            tabCodeEditors.TabPages.Add(pgPivot);
+            UI.ModelLoaded += (sender, args) => pivotView.ResetModel();
             ((ThemedTabControl)tabCodeEditors).UseEditorTabStyle();
             UI.ModelLoaded += (sender, args) => daxQueryTabs.ClearResults();
             UI.ModelLoaded += (sender, args) => exploreDataTabs?.ClearResults();
@@ -153,6 +160,7 @@ Selected.Hierarchies.ForEach(item => item.TranslatedDisplayFolders.SetAll(item.D
             AppTheme.ApplyContextMenu(tvModel.ContextMenuStrip);
             UI.ApplyEditorTheme();
             daxQueryTabs.ApplyTheme();
+            AppTheme.ApplyWorkspaceControl(pivotView);
             exploreDataTabs?.ApplyTheme();
             if (refreshHistory != null) AppTheme.ApplyWorkspaceControl(refreshHistory);
         }
@@ -172,7 +180,7 @@ Selected.Hierarchies.ForEach(item => item.TranslatedDisplayFolders.SetAll(item.D
                     exploreDataTabs = null;
                     RemoveWorkspacePage(page);
                 };
-                tabCodeEditors.TabPages.Insert(tabCodeEditors.TabPages.IndexOf(pgDaxScript) + 1, pgExploreData);
+                tabCodeEditors.TabPages.Insert(tabCodeEditors.TabPages.IndexOf(pgPivot) + 1, pgExploreData);
                 exploreDataTabs.ApplyTheme();
             }
             tabCodeEditors.SelectedTab = pgExploreData;
@@ -1219,6 +1227,12 @@ Selected.Hierarchies.ForEach(item => item.TranslatedDisplayFolders.SetAll(item.D
             if (keyData == Keys.F5 && tabCodeEditors.SelectedTab == pgDaxScript)
             {
                 _ = daxQueryEditor.ExecuteAsync();
+                return true;
+            }
+
+            if (keyData == Keys.F5 && tabCodeEditors.SelectedTab == pgPivot)
+            {
+                _ = pivotView.ExecuteAsync();
                 return true;
             }
 

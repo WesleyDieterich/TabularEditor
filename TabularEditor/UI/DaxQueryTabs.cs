@@ -213,7 +213,7 @@ namespace TabularEditor.UI
             SizeTabStrip();
         }
 
-        private static bool OutsideDragThreshold(Point start, Point current) =>
+        internal static bool OutsideDragThreshold(Point start, Point current) =>
             Math.Abs(current.X - start.X) >= SystemInformation.DragSize.Width / 2 ||
             Math.Abs(current.Y - start.Y) >= SystemInformation.DragSize.Height / 2;
 

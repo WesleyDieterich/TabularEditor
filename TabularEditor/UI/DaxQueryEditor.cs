@@ -294,7 +294,7 @@ namespace TabularEditor.UI
             {
                 data = await Task.Run(() =>
                 {
-                    var result = Database.ExecuteDax(connectionString, catalog, query, cancellation.Token);
+                    var result = Database.ExecuteDax(connectionString, query, cancellation.Token);
                     if (previewQuery != null && result.Tables.Count > 0)
                     {
                         var rows = result.Tables[0].Rows;
