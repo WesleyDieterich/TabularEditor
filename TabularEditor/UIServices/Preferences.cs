@@ -1,6 +1,7 @@
 using System;
 using Newtonsoft.Json;
 using System.Collections.Generic;
+using System.Drawing;
 using System.Text;
 using System.IO;
 using Newtonsoft.Json.Converters;
@@ -21,6 +22,9 @@ namespace TabularEditor.UIServices
         #region Serializable properties
         public bool CheckForUpdates = false;
         public bool UseDarkTheme = true;
+        public Rectangle? MainWindowBounds;
+        [JsonConverter(typeof(StringEnumConverter))]
+        public FormWindowState MainWindowState = FormWindowState.Maximized;
         public List<ConnectionFavorite> ConnectionFavorites = new List<ConnectionFavorite>();
         public bool SkipPatchUpdates = false;
         public bool CollectTelemetry = true;

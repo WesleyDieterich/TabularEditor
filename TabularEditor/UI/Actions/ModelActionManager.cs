@@ -292,7 +292,7 @@ namespace TabularEditor.UI.Actions
                         string message;
                         if (!s.First().CanDelete(out message))
                         {
-                            MessageBox.Show(message, s.Summary() + " cannot be deleted.", MessageBoxButtons.OK, MessageBoxIcon.Stop);
+                            AppMessageBox.Show(message, s.Summary() + " cannot be deleted.", MessageBoxButtons.OK, MessageBoxIcon.Stop);
                             return;
                         }
                         else if (!string.IsNullOrEmpty(message))

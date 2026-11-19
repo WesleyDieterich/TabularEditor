@@ -6,6 +6,7 @@ using System.CodeDom;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Drawing;
 using System.Linq;
 using System.Reflection;
 using System.Text;
@@ -32,7 +33,7 @@ namespace TabularEditor.UI
             AppTheme.ApplySyntaxColor(syntax.NumberStyle, AppTheme.CodeLiteral);
             AppTheme.ApplySyntaxColor(syntax.ClassNameStyle, AppTheme.CodeType);
             AppTheme.ApplySyntaxColor(syntax.AttributeStyle, AppTheme.CodeType);
-            AppTheme.ApplyAutocomplete(popupMenu, System.Drawing.Color.Orange, System.Drawing.Color.Red);
+            AppTheme.ApplyAutocomplete(popupMenu);
             AppTheme.ApplyToolTip(UI.ScriptEditor.ToolTip);
         }
 
@@ -136,7 +137,7 @@ namespace TabularEditor.UI
                 else
                 {
                     var error = compilerResults.Errors[0];
-                    MessageBox.Show($"{ error.ErrorNumber } - { error.ErrorText }", "Error compiling code", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    AppMessageBox.Show($"{ error.ErrorNumber } - { error.ErrorText }", "Error compiling code", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
             }
             if (dyn == null) return;
@@ -173,7 +174,7 @@ namespace TabularEditor.UI
                 }
                 var actionCount = Handler.EndUpdateAll(undoErrors);
 
-                MessageBox.Show(msg, "Error executing code", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                AppMessageBox.Show(msg, "Error executing code", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 UI.StatusExLabel.Text = string.Format("Script execution failed. {0} model change{1}.", actionCount, actionCount == 1 ? "" : "s");
             }
             finally
@@ -202,8 +203,17 @@ namespace TabularEditor.UI
 
     }
 
+    internal sealed class StyledMethodAutocompleteItem : MethodAutocompleteItem
+    {
+        public StyledMethodAutocompleteItem(string text) : base(text) { }
+        public override Color BackColor => AppTheme.AutocompleteItemBackground(this);
+        public override Color ForeColor => AppTheme.AutocompleteItemForeground(this);
+    }
+
     public class MethodAutocompleteItemParen: MethodAutocompleteItem
     {
+        public override Color BackColor => AppTheme.AutocompleteItemBackground(this);
+        public override Color ForeColor => AppTheme.AutocompleteItemForeground(this);
         public MethodAutocompleteItemParen(string text) : base(text)
         {
         }
@@ -251,8 +261,8 @@ namespace TabularEditor.UI
 
             if(type.IsEnum)
             {
-                AddRange(type.GetEnumNames().Select(s => new MethodAutocompleteItem(s) { ImageIndex = TabularIcons.ICON_ENUM }));
-                Add(new MethodAutocompleteItem("HasFlag")
+                AddRange(type.GetEnumNames().Select(s => new StyledMethodAutocompleteItem(s) { ImageIndex = TabularIcons.ICON_ENUM }));
+                Add(new StyledMethodAutocompleteItem("HasFlag")
                 {
                     ToolTipTitle = "bool Enum.HasFlag(Enum flag)",
                     ToolTipText = "Determines whether one or more bits are set in the bit mask.",
@@ -303,7 +313,7 @@ namespace TabularEditor.UI
             {
                 if(fi.IsLiteral)
                 {
-                    Add(new MethodAutocompleteItem(fi.Name) {
+                    Add(new StyledMethodAutocompleteItem(fi.Name) {
                         ToolTipTitle = $"(constant) int DaxToken.{fi.Name} = {fi.GetRawConstantValue()}",
                         ImageIndex = TabularIcons.ICON_PROPERTY
                     });
@@ -360,7 +370,7 @@ namespace TabularEditor.UI
                 /*foreach (var method in typeof(System.Linq.Enumerable)
                     .GetMethods(BindingFlags.Static | BindingFlags.Public).Select(m => m.Name).Distinct())
                 {
-                    yield return new MethodAutocompleteItem(method + "()")
+                    yield return new StyledMethodAutocompleteItem(method + "()")
                     {
                         ToolTipTitle = method,
                         ImageIndex = TabularIcons.ICON_METHOD
@@ -380,7 +390,7 @@ namespace TabularEditor.UI
                 var canRead = pi.CanRead && pi.GetMethod.IsPublic;
                 var canWrite = pi.CanWrite && pi.SetMethod.IsPublic;
 
-                Add(new MethodAutocompleteItem(pi.Name)
+                Add(new StyledMethodAutocompleteItem(pi.Name)
                 {
                     ToolTipTitle = string.Format("{0} {1} {{ {2}}}", propTypeName, pi.Name, (canRead ? "get; " : "") + (canWrite ? "set; " : "")),
                     ToolTipText = pi.GetCustomAttribute<IntelliSenseAttribute>()?.Description ?? string.Empty,
@@ -506,19 +516,19 @@ namespace TabularEditor.UI
             // Type derives from IEnumerable, so let's add a few select LINQ methods:
             if(type.GetInterface("IEnumerable") != null)
             {
-                yield return new MethodAutocompleteItem("Select()")
+                yield return new StyledMethodAutocompleteItem("Select()")
                 {
                     ToolTipTitle = "Select",
                     ToolTipText = "Projects each item of the collection into something else using a lambda expression.\nExample: .Select(Measure => Measure.Table)",
                     ImageIndex = TabularIcons.ICON_EXMETHOD
                 };
-                yield return new MethodAutocompleteItem("Any()")
+                yield return new StyledMethodAutocompleteItem("Any()")
                 {
                     ToolTipTitle = "Any",
                     ToolTipText = "Determines if the collection contains any items. Specify a lambda expression to determine if the collection contains any items satisfying the given criteria.\nExample: .Any(Measure => Measure.Description == \"\")",
                     ImageIndex = TabularIcons.ICON_EXMETHOD
                 };
-                yield return new MethodAutocompleteItem("All()")
+                yield return new StyledMethodAutocompleteItem("All()")
                 {
                     ToolTipTitle = "All",
                     ToolTipText = "Determines if all items in the collection satisfies the given criteria.\nExample: .All(Measure => Measure.Description == \"\")",
@@ -529,7 +539,7 @@ namespace TabularEditor.UI
                 /*foreach (var method in typeof(System.Linq.Enumerable)
                     .GetMethods(BindingFlags.Static | BindingFlags.Public).Select(m => m.Name).Distinct())
                 {
-                    yield return new MethodAutocompleteItem(method + "()")
+                    yield return new StyledMethodAutocompleteItem(method + "()")
                     {
                         ToolTipTitle = method,
                         ImageIndex = TabularIcons.ICON_METHOD
@@ -543,7 +553,7 @@ namespace TabularEditor.UI
                 var propType = new CodeTypeReference(pi.PropertyType);
                 var propTypeName = compiler.GetTypeOutput(propType).Replace("TabularEditor.UI.UISelectionList", "IEnumerable").Replace("TabularEditor.TOMWrapper.", "");
 
-                yield return new MethodAutocompleteItem(pi.Name)
+                yield return new StyledMethodAutocompleteItem(pi.Name)
                 {
                     ToolTipTitle = string.Format("{0} {1} {{ {2}}}", propTypeName, pi.Name, (pi.CanRead ? "get; " : "") + (pi.CanWrite ? "set; " : "")),
                     ToolTipText = pi.GetCustomAttribute<DescriptionAttribute>()?.Description ?? string.Empty,

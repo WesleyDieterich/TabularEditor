@@ -42,7 +42,7 @@ namespace TabularEditor.UI
             var json = File.ReadAllText(Translation_OpenDlg.JsonFile);
 
             var result = Handler.ImportTranslations(json, Translation_OpenDlg.OverwriteExisting, Translation_OpenDlg.IgnoreInvalid);
-            if (!result) MessageBox.Show("Invalid objects encountered while applying translations from file.", "Invalid objects in translation file", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            if (!result) AppMessageBox.Show("Invalid objects encountered while applying translations from file.", "Invalid objects in translation file", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
     }
 }

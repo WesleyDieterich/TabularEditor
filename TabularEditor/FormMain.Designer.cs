@@ -179,7 +179,6 @@ namespace TabularEditor
             this.tabCodeEditors = new TabularEditor.UI.ThemedTabControl();
             this.pgExpressionEditor = new System.Windows.Forms.TabPage();
             this.txtExpression = new TabularEditor.UI.Extensions.FCTB.FastColoredTextBox();
-            this.lblCurrentMeasure = new System.Windows.Forms.Label();
             this.toolStrip3 = new System.Windows.Forms.ToolStrip();
             this.toolStripSeparator7 = new System.Windows.Forms.ToolStripSeparator();
             this.btnFormatDAX = new System.Windows.Forms.ToolStripSplitButton();
@@ -450,8 +449,8 @@ namespace TabularEditor
             // actExpressionAcceptEdit
             // 
             this.actExpressionAcceptEdit.Image = global::TabularEditor.Resources.Check;
-            this.actExpressionAcceptEdit.Text = "Accept edit";
-            this.actExpressionAcceptEdit.ToolTipText = "Accept changes";
+            this.actExpressionAcceptEdit.Text = "Save expression";
+            this.actExpressionAcceptEdit.ToolTipText = "Apply changes to the model";
             this.actExpressionAcceptEdit.UpdateEx += new System.EventHandler<TabularEditor.UI.UpdateExEventArgs>(this.actExpressionAcceptEdit_UpdateEx);
             this.actExpressionAcceptEdit.Execute += new System.EventHandler(this.actExpressionAcceptEdit_Execute);
             // 
@@ -537,14 +536,12 @@ namespace TabularEditor
             this.actUndo.Kind = TabularEditor.UI.Actions.UndoRedo.Undo;
             this.actUndo.ShortcutKeys = ((System.Windows.Forms.Keys)((System.Windows.Forms.Keys.Control | System.Windows.Forms.Keys.Z)));
             this.actUndo.Text = "&Undo";
-            this.actUndo.Execute += new System.EventHandler(this.actUndoRedo_Execute);
             // 
             // actRedo
             // 
             this.actRedo.Kind = TabularEditor.UI.Actions.UndoRedo.Redo;
             this.actRedo.ShortcutKeys = ((System.Windows.Forms.Keys)((System.Windows.Forms.Keys.Control | System.Windows.Forms.Keys.Y)));
             this.actRedo.Text = "&Redo";
-            this.actRedo.Execute += new System.EventHandler(this.actUndoRedo_Execute);
             // 
             // actExpressionFormatDAX
             // 
@@ -1805,7 +1802,6 @@ namespace TabularEditor
             // pgExpressionEditor
             // 
             this.pgExpressionEditor.Controls.Add(this.txtExpression);
-            this.pgExpressionEditor.Controls.Add(this.lblCurrentMeasure);
             this.pgExpressionEditor.Controls.Add(this.toolStrip3);
             this.pgExpressionEditor.Location = new System.Drawing.Point(4, 22);
             this.pgExpressionEditor.Name = "pgExpressionEditor";
@@ -1842,25 +1838,12 @@ namespace TabularEditor
             this.txtExpression.IsReplaceMode = false;
             this.txtExpression.Location = new System.Drawing.Point(3, 46);
             this.txtExpression.Name = "txtExpression";
-            this.txtExpression.Paddings = new System.Windows.Forms.Padding(0);
             this.txtExpression.SelectionColor = System.Drawing.Color.FromArgb(((int)(((byte)(60)))), ((int)(((byte)(0)))), ((int)(((byte)(0)))), ((int)(((byte)(255)))));
             this.txtExpression.ServiceColors = ((FastColoredTextBoxNS.ServiceColors)(resources.GetObject("txtExpression.ServiceColors")));
             this.txtExpression.Size = new System.Drawing.Size(644, 198);
             this.txtExpression.TabIndex = 23;
             this.txtExpression.Zoom = 100;
             this.txtExpression.ImeMode = System.Windows.Forms.ImeMode.On;
-            // 
-            // lblCurrentMeasure
-            // 
-            this.lblCurrentMeasure.Dock = System.Windows.Forms.DockStyle.Top;
-            this.lblCurrentMeasure.Font = new System.Drawing.Font("Consolas", 9.75F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.lblCurrentMeasure.Location = new System.Drawing.Point(3, 28);
-            this.lblCurrentMeasure.Name = "lblCurrentMeasure";
-            this.lblCurrentMeasure.Padding = new System.Windows.Forms.Padding(0, 1, 0, 0);
-            this.lblCurrentMeasure.Size = new System.Drawing.Size(644, 18);
-            this.lblCurrentMeasure.TabIndex = 24;
-            this.lblCurrentMeasure.Visible = false;
-            this.lblCurrentMeasure.Paint += new System.Windows.Forms.PaintEventHandler(this.lblCurrentMeasure_Paint);
             // 
             // toolStrip3
             // 
@@ -1976,7 +1959,6 @@ namespace TabularEditor
             this.txtAdvanced.LeftBracket2 = '{';
             this.txtAdvanced.Location = new System.Drawing.Point(3, 28);
             this.txtAdvanced.Name = "txtAdvanced";
-            this.txtAdvanced.Paddings = new System.Windows.Forms.Padding(0);
             this.txtAdvanced.RightBracket = ')';
             this.txtAdvanced.RightBracket2 = '}';
             this.txtAdvanced.SelectionColor = System.Drawing.Color.FromArgb(((int)(((byte)(60)))), ((int)(((byte)(0)))), ((int)(((byte)(0)))), ((int)(((byte)(255)))));
@@ -2658,7 +2640,6 @@ namespace TabularEditor
         private Aga.Controls.Tree.NodeControls.NodeTextBox _dataType;
         private Aga.Controls.Tree.NodeControls.NodeTextBox _description;
         private UI.Extensions.FCTB.FastColoredTextBox txtExpression;
-        private System.Windows.Forms.Label lblCurrentMeasure;
         private System.Windows.Forms.ToolStrip toolStrip3;
         private System.Windows.Forms.ToolStripButton toolStripButton9;
         private System.Windows.Forms.ToolStripButton toolStripButton10;

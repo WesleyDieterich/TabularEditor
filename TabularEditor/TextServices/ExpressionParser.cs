@@ -171,12 +171,14 @@ namespace TabularEditor.TextServices
         public static List<IToken> SyntaxHighlight(FastColoredTextBox textbox)
         {
             List<IToken> tokens;
+            var text = textbox.Text;
+            var useSemicolons = Preferences.Current.UseSemicolonsAsSeparators;
 
             // TODO: This is slow on a large DAX expression and may cause flickering...
             //textbox.SuspendDrawing(); // Doesn't work as we might be on a different thread
             try
             {
-                var lexer = new DAXLexer(new DAXCharStream(textbox.Text, Preferences.Current.UseSemicolonsAsSeparators));
+                var lexer = new DAXLexer(new DAXCharStream(text, useSemicolons));
                 lexer.RemoveErrorListeners();
                 tokens = lexer.GetAllTokens().ToList();
             }
@@ -188,6 +190,7 @@ namespace TabularEditor.TextServices
 
             textbox.BeginInvoke((MethodInvoker)(() =>
             {
+                if (textbox.Text != text || Preferences.Current.UseSemicolonsAsSeparators != useSemicolons) return;
                 textbox.SuspendDrawing();
                 textbox.ClearStyle(StyleIndex.All);
                 foreach (var tok in tokens)

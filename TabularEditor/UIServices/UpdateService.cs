@@ -54,7 +54,7 @@ namespace TabularEditor.UIServices
             }
             catch (Exception ex)
             {
-                if(displayErrors) MessageBox.Show(ex.Message, "Unable to check for updated versions", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                if(displayErrors) AppMessageBox.Show(ex.Message, "Unable to check for updated versions", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return VersionCheckResult.Unknown;
             }
         }

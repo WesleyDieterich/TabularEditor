@@ -390,17 +390,11 @@ namespace TabularEditor.TOMWrapper
 
         Table ITabularTableObject.Table => Table;
 
+        // The collection node has a fixed name and no property changes to report.
         event PropertyChangedEventHandler INotifyPropertyChanged.PropertyChanged
         {
-            add
-            {
-                throw new NotImplementedException();
-            }
-
-            remove
-            {
-                throw new NotImplementedException();
-            }
+            add { }
+            remove { }
         }
 
         bool ITabularNamedObject.CanDelete() => false;

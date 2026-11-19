@@ -221,7 +221,8 @@ namespace TabularEditor.UI
                 var node = UI.TreeView.SelectedNode;
                 if (node == null || UI.TreeView.CurrentEditor != null) return;
 
-                if (node.Tag is IExpressionObject) ExpressionEditor_Edit(node.Tag as IExpressionObject);
+                if (node.Tag is IExpressionObject expressionObject && CanOpenExpressionFromTree(expressionObject))
+                    ExpressionEditor_Edit(expressionObject);
                 else if (!node.IsLeaf) if (node.IsExpanded) node.Collapse(); else node.Expand();
                 e.Handled = true;
             }
@@ -318,10 +319,7 @@ namespace TabularEditor.UI
 
             var obj = UI.TreeView.SelectedNode?.Tag as IExpressionObject;
 
-            // Tables have "Default Detail Rows Expressions", but only for CompatibilityLevel 1400 or newer.
-            if (obj is Table && !(obj is CalculatedTable) && Handler.CompatibilityLevel < 1400) obj = null;
-
-            ExpressionEditor_Preview(obj);
+            if (!(obj is Table)) ExpressionEditor_Preview(obj);
             ScriptEditor_HideErrors();
 
             if (UI.TreeView.SelectedNode != null || ShowSelectionStatus)
@@ -348,12 +346,13 @@ namespace TabularEditor.UI
 
         private void TreeView_NodeMouseDoubleClick(object sender, TreeNodeAdvMouseEventArgs e)
         {
-            // Tables shouldn't be editable in the Expression Editor in CL 1200 or less (as they don't have Detail Rows Expressions).
-            if (e.Node.Tag is Table && Handler.CompatibilityLevel < 1400) return;
-
-            if (e.Node.Tag is IExpressionObject)
-                ExpressionEditor_Edit(e.Node.Tag as IExpressionObject);
+            if (e.Node.Tag is IExpressionObject obj && CanOpenExpressionFromTree(obj))
+                ExpressionEditor_Edit(obj);
         }
+
+        // Regular tables support Default Detail Rows Expression from compatibility level 1400.
+        private bool CanOpenExpressionFromTree(IExpressionObject obj) =>
+            !(obj is Table) || obj is CalculatedTable || Handler.CompatibilityLevel >= 1400;
 
         private void TreeView_ItemDrag(object sender, ItemDragEventArgs e)
         {

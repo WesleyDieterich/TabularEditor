@@ -77,6 +77,7 @@ namespace TabularEditor.UI
                 if (editor.IsHandleCreated) ExpressionParser.SyntaxHighlight(editor);
             };
             editor.TextChanged += (sender, args) => ScheduleHighlight();
+            editor.TextChanged += (sender, args) => ScriptChanged?.Invoke(this, EventArgs.Empty);
             editor.VisibleChanged += (sender, args) => { if (editor.Visible) ScheduleHighlight(); };
             editor.Text = "EVALUATE\r\n";
 
@@ -172,6 +173,7 @@ namespace TabularEditor.UI
 
         public void ApplyTheme()
         {
+            AppTheme.ApplyQueryEditor(this);
             intelliSense.ApplyTheme();
             typeToolTip.BackColor = AppTheme.IsDark ? AppTheme.Raised : SystemColors.Info;
             typeToolTip.ForeColor = AppTheme.IsDark ? AppTheme.Text : SystemColors.InfoText;
@@ -180,6 +182,8 @@ namespace TabularEditor.UI
 
         public void Find() => editor.ShowFindDialog();
         public void Replace() => editor.ShowReplaceDialog();
+        public string ScriptText => editor.Text;
+        public event EventHandler ScriptChanged;
         public bool EditorContainsFocus => editor.ContainsFocus;
         public bool CanComment => editor.ContainsFocus && editor.TextLength > 0;
         public void Comment() => editor.InsertLinePrefix("//");
@@ -304,7 +308,7 @@ namespace TabularEditor.UI
             else if (failure != null)
             {
                 rowCount.Text = $"Query failed  ·  {elapsed.TotalSeconds:N1} s";
-                MessageBox.Show(this, failure.Message, "DAX query failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                AppMessageBox.Show(this, failure.Message, "DAX query failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
             else ShowResults(data, query, elapsed);
         }
@@ -812,7 +816,7 @@ namespace TabularEditor.UI
                 }
                 catch (Exception error)
                 {
-                    MessageBox.Show(this, error.Message, "Excel export failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    AppMessageBox.Show(this, error.Message, "Excel export failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
             }
         }

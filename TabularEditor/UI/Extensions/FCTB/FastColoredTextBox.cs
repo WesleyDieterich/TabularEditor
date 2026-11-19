@@ -3,12 +3,19 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Windows.Forms;
 
 namespace TabularEditor.UI.Extensions.FCTB
 {
     public class FastColoredTextBox: FastColoredTextBoxNS.FastColoredTextBox
     {
         ReplaceForm betterReplaceForm;
+
+        public FastColoredTextBox()
+        {
+            // Match the gap between the line-number divider and the text.
+            Paddings = new Padding(0, 7, 0, 0);
+        }
 
         public override void ShowReplaceDialog(string findText)
         {

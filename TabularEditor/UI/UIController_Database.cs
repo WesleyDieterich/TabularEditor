@@ -18,8 +18,6 @@ namespace TabularEditor.UI
 
         public void Database_Deploy()
         {
-            ExpressionEditor_AcceptEdit();
-
             var f = new DeployForm();
             f.PreselectDb = LastDeploymentDb;
             if (LastDeployOptions != null) f.DeployOptions = LastDeployOptions;
@@ -68,7 +66,7 @@ namespace TabularEditor.UI
 
                 if (error || cancelled)
                 {
-                    MessageBox.Show(message, error ? "Error occured during deployment" : "Deploy cancelled", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    AppMessageBox.Show(message, error ? "Error occured during deployment" : "Deploy cancelled", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
 
                 UI.StatusLabel.Text = string.Format(error ? "{0}: Deployment failed!" : cancelled ? "{0}: Deployment cancelled!" : "{0}: Deployment succeeded!", f.DeployTargetServer.Name);
@@ -181,7 +179,7 @@ namespace TabularEditor.UI
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show(ex.Message, "Error connecting to database", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    AppMessageBox.Show(ex.Message, "Error connecting to database", MessageBoxButtons.OK, MessageBoxIcon.Error);
                     Handler = oldHandler;
                     LoadTabularModelToUI();
                 }
@@ -214,15 +212,15 @@ namespace TabularEditor.UI
                 var conflictInfo = Handler.CheckConflicts();
                 if (conflictInfo.Conflict)
                 {
-                    var res = MessageBox.Show(string.Format("Changes have been made to the deployed version of the model, since it was loaded into Tabular Editor.\n\nDeployed model version: {0} (changed {1})\nCurrent model version: {2}\n\nDo you want to overwrite the deployed model?",
+                    var res = AppMessageBox.Show(UI.FormMain, string.Format("Changes have been made to the deployed version of the model, since it was loaded into Tabular Editor.\n\nDeployed model version: {0} (changed {1})\nCurrent model version: {2}\n\nDo you want to overwrite the deployed model?",
                         conflictInfo.DatabaseVersion, conflictInfo.DatabaseLastUpdate, conflictInfo.LoadedVersion),
-                        "Change conflict", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+                        "Change conflict", MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2);
                     if (res == DialogResult.No) return;
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show(ex.Message + "\n\nSave the model as a file to make sure you do not lose any work. In case the database connection was lost, you can still apply your changes to the database by using the \"Model > Deploy\" option.", "Could not save metadata changes to database", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                AppMessageBox.Show(ex.Message + "\n\nSave the model as a file to make sure you do not lose any work. In case the database connection was lost, you can still apply your changes to the database by using the \"Model > Deploy\" option.", "Could not save metadata changes to database", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return;
             }
 
@@ -240,7 +238,7 @@ namespace TabularEditor.UI
                     }
                     catch (Exception e)
                     {
-                        MessageBox.Show(e.Message, "Unable to save metadata backup", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        AppMessageBox.Show(UI.FormMain, e.Message, "Unable to save metadata backup", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     }
                 }
 
@@ -252,7 +250,7 @@ namespace TabularEditor.UI
                 }
                 catch (Exception e)
                 {
-                    MessageBox.Show(e.Message + "\n\nSave the model as a file to make sure you do not lose any work. In case the database connection was lost, you can still apply your changes to the database by using the \"Model > Deploy\" option.", "Could not save metadata changes to database", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    AppMessageBox.Show(e.Message + "\n\nSave the model as a file to make sure you do not lose any work. In case the database connection was lost, you can still apply your changes to the database by using the \"Model > Deploy\" option.", "Could not save metadata changes to database", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
 
                 UI.TreeView.Refresh();

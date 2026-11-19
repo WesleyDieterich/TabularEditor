@@ -27,31 +27,20 @@ namespace TabularEditor.UI
             DependencyForm.Show();
         }
 
-        private IExpressionObject _expressionEditor_Current = null;
-        public IExpressionObject ExpressionEditor_Current {
-            get {
-                return _expressionEditor_Current;    
-            }
-            set
-            {
-                if (_expressionEditor_Current != null) _expressionEditor_Current.PropertyChanged -= ExpressionEditor_Current_PropertyChanged;
-                _expressionEditor_Current = value;
-                if (_expressionEditor_Current != null) _expressionEditor_Current.PropertyChanged += ExpressionEditor_Current_PropertyChanged;
-
-                ExpressionEditor_SetText();
-            }
-        }
+        public IExpressionObject ExpressionEditor_Current => activeExpressionTab?.Object;
 
         private void ExpressionEditor_Current_PropertyChanged(object sender, PropertyChangedEventArgs e)
         {
-            if (e.PropertyName == "Name") UI.CurrentMeasureLabel.Text = 
-                    ((sender as IDaxObject)?.DaxObjectName ?? 
-                    ((sender as IExpressionObject).Name + ".Expression")) + " :=";
-            if (e.PropertyName.EndsWith("Expression"))
+            var tab = expressionTabs.FirstOrDefault(item => ReferenceEquals(item.Object, sender));
+            if (tab == null) return;
+            UpdateExpressionTab(tab);
+            if (tab == activeExpressionTab)
             {
-                if (sender == ExpressionEditor_Current) UI.ExpressionEditor.Text = GetText();
-                if (UI.PropertyGrid.SelectedObject == ExpressionEditor_Current) UI.PropertyGrid.Refresh();
-                ExpressionEditor_CancelEdit();
+                if (e.PropertyName == GetProperty() || e.PropertyName.EndsWith("Expression", StringComparison.Ordinal))
+                {
+                    if (!tab.Drafts.ContainsKey(CurrentDaxProperty)) ExpressionEditor_SetText();
+                    if (UI.PropertyGrid.SelectedObject == tab.Object) UI.PropertyGrid.Refresh();
+                }
             }
         }
 
@@ -63,6 +52,7 @@ namespace TabularEditor.UI
             ExpressionParser.ApplyTheme();
             daxIntelliSense.ApplyTheme();
             ApplyScriptEditorTheme();
+            ApplyExpressionTabTheme();
             UI.ExpressionEditor.Invalidate();
             UI.ScriptEditor.Invalidate();
         }
@@ -79,6 +69,7 @@ namespace TabularEditor.UI
             UI.ExpressionSelector.ComboBox.DisplayMember = "Description";
 
             syntaxHighlightTimer.Tick += ExpressionEditor_SyntaxHighlightTick;
+            InitializeExpressionTabs();
         }
 
         Task syntaxHighlightTask;
@@ -100,7 +91,7 @@ namespace TabularEditor.UI
         {
             if (ExpressionEditor_Current is IDaxDependantObject)
             {
-                SetText(UI.ExpressionEditor.Text, LastDaxProperty);
+                activeExpressionTab.Property = CurrentDaxProperty;
                 ExpressionEditor_SetText();
             }
         }
@@ -125,11 +116,6 @@ namespace TabularEditor.UI
                 if (e.KeyChar == 27)
                 {
                     ExpressionEditor_CancelEdit();
-                    e.Handled = true;
-                }
-                else if (e.KeyChar == 10)
-                {
-                    ExpressionEditor_AcceptEdit();
                     e.Handled = true;
                 }
             }
@@ -192,7 +178,8 @@ namespace TabularEditor.UI
 
         public void ExpressionEditor_BeginEdit()
         {
-            if (!ExpressionEditor_IsEditing) ExpressionEditor_Edit(ExpressionEditor_Current, false);
+            if (!ExpressionEditor_IsEditing && ExpressionEditor_Current != null)
+                ExpressionEditor_Edit(ExpressionEditor_Current, false);
         }
 
         Timer syntaxHighlightTimer = new Timer() { Interval = 500, Enabled = false };
@@ -204,6 +191,17 @@ namespace TabularEditor.UI
             if (ExpressionEditor_SuspendTextChanged) return;
 
             ExpressionEditor_BeginEdit();
+            if (activeExpressionTab != null && !UI.ExpressionEditor.ReadOnly)
+            {
+                var property = CurrentDaxProperty;
+                var text = UI.ExpressionEditor.Text.Replace("\r", "");
+                if (ExpressionEditor_IsDax && Preferences.Current.UseSemicolonsAsSeparators)
+                    text = ExpressionParser.SemicolonsToCommas(text);
+                if (text == ReadExpression(activeExpressionTab.Object, property).Replace("\r", ""))
+                    activeExpressionTab.Drafts.Remove(property);
+                else activeExpressionTab.Drafts[property] = text;
+                UpdateExpressionTab(activeExpressionTab);
+            }
 
             if(syntaxHighlightTimer.Enabled) syntaxHighlightTimer.Enabled = false;
             syntaxHighlightTimer.Interval = 500;
@@ -267,63 +265,38 @@ namespace TabularEditor.UI
             }
         }
 
-        private string GetProperty()
+        private string GetProperty() => GetProperty(ExpressionEditor_Current, CurrentDaxProperty);
+
+        private static string GetProperty(IExpressionObject obj, DAXProperty property)
         {
-            if (ExpressionEditor_Current is Partition && CurrentDaxProperty == DAXProperty.Expression)
+            if (obj is Partition && property == DAXProperty.Expression)
             {
                 return TOMWrapper.Properties.EXPRESSION;
             }
-            return (ExpressionEditor_Current as IDaxDependantObject)?.GetDAXProperty(CurrentDaxProperty) ?? TOMWrapper.Properties.EXPRESSION;
+            return (obj as IDaxDependantObject)?.GetDAXProperty(property) ?? TOMWrapper.Properties.EXPRESSION;
+        }
+
+        private static string ReadExpression(IExpressionObject obj, DAXProperty prop)
+        {
+            if (obj is Partition && prop == DAXProperty.Expression) return obj.Expression ?? "";
+            if (obj is IDaxDependantObject daxObject) return daxObject.GetDAX(prop) ?? "";
+            return obj?.Expression ?? "";
         }
 
         private string GetText()
         {
-            string value;
-
-            if(ExpressionEditor_Current is Partition && CurrentDaxProperty == DAXProperty.Expression)
-            {
-                value = ExpressionEditor_Current.Expression ?? "";
-            }
-            else if(ExpressionEditor_Current is IDaxDependantObject daxObject)
-            {
-                value = daxObject.GetDAX(CurrentDaxProperty) ?? "";
-            }
-            else if (ExpressionEditor_Current != null)
-            {
-                value = ExpressionEditor_Current.Expression ?? "";
-            }
-            else return "";
-
-            // Do semicolon replacement if needed:
+            var value = activeExpressionTab != null && activeExpressionTab.Drafts.TryGetValue(CurrentDaxProperty, out var draft)
+                ? draft : ReadExpression(ExpressionEditor_Current, CurrentDaxProperty);
             if (ExpressionEditor_IsDax && Preferences.Current.UseSemicolonsAsSeparators)
                 value = ExpressionParser.CommasToSemicolons(value);
-
             return value;
         }
 
-        private void SetText(string value)
+        private static void WriteExpression(IExpressionObject obj, DAXProperty prop, string value)
         {
-            SetText(value, CurrentDaxProperty);
-        }
-
-        private void SetText(string value, DAXProperty prop)
-        {
-            // Do semicolon replacement if needed:
-            if (ExpressionEditor_IsDax && Preferences.Current.UseSemicolonsAsSeparators)
-                value = ExpressionParser.SemicolonsToCommas(value);
-
-            if (ExpressionEditor_Current is Partition && prop == DAXProperty.Expression)
-            {
-                ExpressionEditor_Current.Expression = value;
-            }
-            else if (ExpressionEditor_Current is IDaxDependantObject)
-            {
-                (ExpressionEditor_Current as IDaxDependantObject).SetDAX(prop, value);
-            }
-            else if (ExpressionEditor_Current != null)
-            {
-                ExpressionEditor_Current.Expression = value;
-            }
+            if (obj is Partition && prop == DAXProperty.Expression) obj.Expression = value;
+            else if (obj is IDaxDependantObject daxObject) daxObject.SetDAX(prop, value);
+            else obj.Expression = value;
         }
 
         private DAXProperty CurrentDaxProperty
@@ -337,7 +310,6 @@ namespace TabularEditor.UI
                 UI.ExpressionSelector.SelectedItem = UI.ExpressionSelector.Items.Cast<DaxPropertyComboBoxItem>().FirstOrDefault(i => i.Value == value) ?? DaxPropertyComboBoxItem.Items[value];
             }
         }
-        private DAXProperty LastDaxProperty;
 
         private void ExpressionEditor_SetText()
         {
@@ -354,37 +326,25 @@ namespace TabularEditor.UI
                 ExpressionEditor_SyntaxHighlight();
             }
             UI.ExpressionEditor.ClearUndo();
-            UI.ExpressionEditor.SelectionStart = i;
-
-            // Only show label bar for DAX objects, when editing their expression:
-            if (_expressionEditor_Current is IDaxObject)
-            {
-                UI.CurrentMeasureLabel.Text = (_expressionEditor_Current as IDaxObject).DaxObjectName + (CurrentDaxProperty == DAXProperty.Expression ? "" : "." + CurrentDaxProperty.ToString()) + " :=";
-                UI.CurrentMeasureLabel.Visible = true;
-            }
-            else
-            {
-                UI.CurrentMeasureLabel.Visible = false;
-            }
-
+            UI.ExpressionEditor.SelectionStart = Math.Min(i, UI.ExpressionEditor.TextLength);
             ExpressionEditor_SuspendTextChanged = false;
-
-            LastDaxProperty = CurrentDaxProperty;
         }
 
         private void ExpressionEditor_Preview(IExpressionObject obj)
         {
-            // TODO: Consider inspecting the expression of partitions, to determine
-            // if the expression editor should use SQL syntax highlighting. This would
-            // typically be the case for partitions using OLE DB or SQLNCLI providers.
-
+            if (obj == null || ReferenceEquals(obj, ExpressionEditor_Current)) return;
             if (ExpressionEditor_Current != null)
             {
                 (IsNavigatingBack ? Forward : Back).Push(ExpressionEditor_Current);
             }
+            OpenExpressionTab(obj);
+        }
 
-            if (ExpressionEditor_IsEditing) ExpressionEditor_AcceptEdit();
-
+        private void LoadExpressionTab(ExpressionTab tab)
+        {
+            activeExpressionTab = tab;
+            ExpressionEditor_IsEditing = tab?.Drafts.Count > 0;
+            var obj = tab?.Object;
             // Update the Expression Selector combobox:
             UI.ExpressionSelector.ComboBox.SelectedValueChanged -= ExpressionEditor_ExpressionSelectorChanged;
             UI.ExpressionSelector.Items.Clear();
@@ -395,7 +355,7 @@ namespace TabularEditor.UI
                 if (obj is MPartition) UI.ExpressionSelector.Items.Add(DaxPropertyComboBoxItem.MExpression);
                 else if (obj is Partition) UI.ExpressionSelector.Items.Add(DaxPropertyComboBoxItem.Query);
                 foreach (var daxProp in ddo.GetDAXProperties()) UI.ExpressionSelector.Items.Add(DaxPropertyComboBoxItem.Items[daxProp]);
-                CurrentDaxProperty = ddo.GetDefaultDAXProperty();
+                CurrentDaxProperty = tab.Property;
             }
             else
             {
@@ -403,13 +363,13 @@ namespace TabularEditor.UI
             }
             UI.ExpressionSelector.ComboBox.SelectedValueChanged += ExpressionEditor_ExpressionSelectorChanged;
 
-            ExpressionEditor_Current = obj;
+            ExpressionEditor_SetText();
             UI.ExpressionEditor.Enabled = obj != null;
         }
 
         private void ExpressionEditor_Edit(IExpressionObject obj, bool switchToTab = true)
         {
-            // Make sure the ExpressionEditor tab page is visible:
+            if (obj == null) return;
             if (switchToTab)
             {
                 var page = UI.ExpressionEditor.Parent as TabPage;
@@ -417,15 +377,8 @@ namespace TabularEditor.UI
                     (page.Parent as TabControl).SelectTab(page);
             }
 
-            // Accept any previous edits:
-            if (ExpressionEditor_IsEditing) ExpressionEditor_AcceptEdit();
-
-            if (ExpressionEditor_Current != obj)
-            {
-                ExpressionEditor_Current = obj;
-                ExpressionEditor_SetText();
-            }
-            UI.StatusLabel.Text = "Editing " + (obj as IDaxObject)?.DaxObjectFullName ?? obj.Name;
+            if (!ReferenceEquals(ExpressionEditor_Current, obj)) ExpressionEditor_Preview(obj);
+            UI.StatusLabel.Text = "Editing " + ((obj as IDaxObject)?.DaxObjectFullName ?? obj.Name);
             ExpressionEditor_IsEditing = true;
             if(!UI.ExpressionEditor.Focused) UI.ExpressionEditor.SelectAll();
             UI.ExpressionEditor.Focus();
@@ -436,6 +389,8 @@ namespace TabularEditor.UI
             if (ExpressionEditor_IsEditing)
             {
                 UI.StatusLabel.Text = "";
+                activeExpressionTab?.Drafts.Remove(CurrentDaxProperty);
+                if (activeExpressionTab != null) UpdateExpressionTab(activeExpressionTab);
                 ExpressionEditor_IsEditing = false;
                 ExpressionEditor_SetText();
                 UI.TreeView.Focus();
@@ -444,22 +399,9 @@ namespace TabularEditor.UI
 
         public void ExpressionEditor_AcceptEdit()
         {
-            if (ExpressionEditor_IsEditing)
-            {
-                UI.StatusLabel.Text = "";
-                SetText(UI.ExpressionEditor.Text);
-                ExpressionEditor_IsEditing = false;
-            }
+            if (activeExpressionTab != null) SaveExpressionTabs(new[] { activeExpressionTab });
         }
 
-        public bool ExpressionEditor_IsDirty
-        {
-            get
-            {
-                if (ExpressionEditor_IsEditing)
-                    return GetText() != UI.ExpressionEditor.Text.Replace("\r", "");
-                else return false;
-            }
-        }
+        public bool ExpressionEditor_IsDirty => activeExpressionTab?.Drafts.Count > 0;
     }
 }

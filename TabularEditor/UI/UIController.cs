@@ -175,8 +175,7 @@ namespace TabularEditor.UI
 
             ClipboardListener_ClipboardUpdate(this, new EventArgs());
 
-            ExpressionEditor_CancelEdit();
-            ExpressionEditor_Current = null;
+            ResetExpressionTabs();
 
             Forward = new Stack<IExpressionObject>();
             Back = new Stack<IExpressionObject>();
@@ -407,7 +406,6 @@ namespace TabularEditor.UI
         public ToolStripLabel StatusExLabel;
         public ToolStripLabel ErrorLabel;
         public ToolStripLabel BpaLabel;
-        public Label CurrentMeasureLabel;
         public FormMain FormMain;
         public ToolStripDropDownItem ModelMenu;
         public ToolStripDropDownItem ToolsMenu;

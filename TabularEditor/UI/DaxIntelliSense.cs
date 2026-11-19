@@ -72,7 +72,7 @@ namespace TabularEditor.UI
         internal void ApplyTheme()
         {
             Close();
-            AppTheme.ApplyAutocomplete(completion, Color.Orange, Color.Red);
+            AppTheme.ApplyAutocomplete(completion);
             AppTheme.ApplyToolTip(parameterTip);
             AppTheme.ApplyToolTip(editor.ToolTip);
         }
@@ -287,6 +287,8 @@ namespace TabularEditor.UI
             }
 
             public override CompareResult Compare(string fragmentText) => CompareResult.Visible;
+            public override Color BackColor => AppTheme.AutocompleteItemBackground(this);
+            public override Color ForeColor => AppTheme.AutocompleteItemForeground(this);
 
             public override string GetTextForReplace() => appendParentheses ? Text + "()" : Text;
 

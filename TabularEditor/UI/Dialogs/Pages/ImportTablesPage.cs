@@ -459,7 +459,7 @@ namespace TabularEditor.UI.Dialogs.Pages
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show("Unable to read list of databases from the source:\n\n" + ex.Message, "Unable to read source metadata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    AppMessageBox.Show("Unable to read list of databases from the source:\n\n" + ex.Message, "Unable to read source metadata", MessageBoxButtons.OK, MessageBoxIcon.Error);
                     return Enumerable.Empty<SchemaNode>();
                 }
             }
@@ -483,7 +483,7 @@ namespace TabularEditor.UI.Dialogs.Pages
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show("Unable to read list of tables/views from the source:\n\n" + ex.Message, "Unable to read source metadata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    AppMessageBox.Show("Unable to read list of tables/views from the source:\n\n" + ex.Message, "Unable to read source metadata", MessageBoxButtons.OK, MessageBoxIcon.Error);
                     return Enumerable.Empty<SchemaNode>();
                 }
             }

@@ -445,7 +445,7 @@ namespace TabularEditor.Scripting
             var header = string.Format("Script error{0}", lineNumber >= 0 ? " (line " + lineNumber + ")" : "", message);
 
             if (Program.CommandLineMode) Program.CommandLine.Error((suppressHeader ? "" : ( header + ": ")) + message);
-            else MessageBox.Show(message, header, MessageBoxButtons.OK, MessageBoxIcon.Error);
+            else AppMessageBox.Show(message, header, MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
 
         public static void OutputErrors(IEnumerable<TabularNamedObject> items)

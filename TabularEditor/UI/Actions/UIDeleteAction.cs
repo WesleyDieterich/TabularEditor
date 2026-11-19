@@ -43,7 +43,7 @@ namespace TabularEditor.UI
                 {
                     if(Selected.DataSources.Any(ds => ds.UsedByPartitions.Any()))
                     {
-                        MessageBox.Show(string.Format("The selected data source{0} are used by one or more tables. Delete the tables before deleting the data source.", Selected.Count > 1 ? "s" : ""),
+                        AppMessageBox.Show(string.Format("The selected data source{0} are used by one or more tables. Delete the tables before deleting the data source.", Selected.Count > 1 ? "s" : ""),
                             "Object in use", MessageBoxButtons.OK, MessageBoxIcon.Stop);
                         return;
                     }

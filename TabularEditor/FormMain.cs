@@ -21,8 +21,10 @@ namespace TabularEditor
         public UIController UI;
 
         private MacroJson CurrentMacro;
-        private DaxQueryEditor daxQueryEditor;
+        private DaxQueryTabs daxQueryTabs;
+        private DaxQueryEditor daxQueryEditor => daxQueryTabs?.ActiveEditor;
         private TabPage pgDaxScript;
+        private FormWindowState lastVisibleWindowState = FormWindowState.Maximized;
 
         public static FormMain Singleton;
 
@@ -40,11 +42,12 @@ namespace TabularEditor
             propertyGrid1.Site = new DesignerHost();
 
             SetupUIController();
-            daxQueryEditor = new DaxQueryEditor(() => UI.Handler);
+            daxQueryTabs = new DaxQueryTabs(() => UI.Handler);
             pgDaxScript = new TabPage("DAX Query");
-            pgDaxScript.Controls.Add(daxQueryEditor);
+            pgDaxScript.Controls.Add(daxQueryTabs);
             tabCodeEditors.TabPages.Add(pgDaxScript);
-            UI.ModelLoaded += (sender, args) => daxQueryEditor.ClearResults();
+            ((ThemedTabControl)tabCodeEditors).UseEditorTabStyle();
+            UI.ModelLoaded += (sender, args) => daxQueryTabs.ClearResults();
             txtFilter.Control.SetCueBanner("Search model");
 
             ///// Populate macros and samples /////
@@ -100,13 +103,49 @@ Selected.Columns.ForEach(item => item.TranslatedDisplayFolders.SetAll(item.Displ
 Selected.Hierarchies.ForEach(item => item.TranslatedDisplayFolders.SetAll(item.DisplayFolder));");
             });
             ApplyWorkspaceTheme();
+            RestoreWindowPlacement();
+        }
+
+        private void RestoreWindowPlacement()
+        {
+            var preferences = Preferences.Current;
+            if (preferences.MainWindowBounds is Rectangle saved && saved.Width > 0 && saved.Height > 0)
+            {
+                var screen = Screen.AllScreens.Any(display => display.WorkingArea.IntersectsWith(saved))
+                    ? Screen.FromRectangle(saved) : Screen.PrimaryScreen;
+                var area = screen.WorkingArea;
+                var width = Math.Min(area.Width, Math.Max(MinimumSize.Width, saved.Width));
+                var height = Math.Min(area.Height, Math.Max(MinimumSize.Height, saved.Height));
+                var x = Math.Max(area.Left, Math.Min(saved.Left, area.Right - width));
+                var y = Math.Max(area.Top, Math.Min(saved.Top, area.Bottom - height));
+                StartPosition = FormStartPosition.Manual;
+                Bounds = new Rectangle(x, y, width, height);
+            }
+
+            lastVisibleWindowState = preferences.MainWindowState == FormWindowState.Normal
+                ? FormWindowState.Normal : FormWindowState.Maximized;
+            WindowState = lastVisibleWindowState;
+        }
+
+        protected override void OnResize(EventArgs e)
+        {
+            base.OnResize(e);
+            if (WindowState != FormWindowState.Minimized) lastVisibleWindowState = WindowState;
+        }
+
+        private void SaveWindowPlacement()
+        {
+            var preferences = Preferences.Current;
+            var bounds = WindowState == FormWindowState.Normal ? Bounds : RestoreBounds;
+            if (bounds.Width > 0 && bounds.Height > 0) preferences.MainWindowBounds = bounds;
+            preferences.MainWindowState = lastVisibleWindowState;
         }
 
         private void ApplyWorkspaceTheme()
         {
             AppTheme.Apply(this);
             UI.ApplyEditorTheme();
-            daxQueryEditor.ApplyTheme();
+            daxQueryTabs.ApplyTheme();
         }
 
         private void StyleWorkspace()
@@ -118,7 +157,6 @@ Selected.Hierarchies.ForEach(item => item.TranslatedDisplayFolders.SetAll(item.D
             tvModel.Font = workspaceFont;
             txtExpression.Font = codeFont;
             txtAdvanced.Font = codeFont;
-            lblCurrentMeasure.Font = codeFont;
             ArrangeWorkspaceToolbars();
 
             var renderer = new ToolStripProfessionalRenderer(new WorkspaceColors()) { RoundedEdges = false };
@@ -368,7 +406,6 @@ Selected.Hierarchies.ForEach(item => item.TranslatedDisplayFolders.SetAll(item.D
                 BpaLabel = lblBpaRules,
                 StatusExLabel = lblScriptStatus,
                 OpenBimDialog = dlgOpenFile,
-                CurrentMeasureLabel = lblCurrentMeasure,
                 ModelMenu = modelToolStripMenuItem,
                 PerspectiveSelector = cmbPerspective,
                 TranslationSelector = cmbTranslation,
@@ -441,6 +478,11 @@ Selected.Hierarchies.ForEach(item => item.TranslatedDisplayFolders.SetAll(item.D
 
         private void FormMain_FormClosing(object sender, FormClosingEventArgs e)
         {
+            if (UI.CancelDiscardingExpressionDrafts())
+            {
+                e.Cancel = true;
+                return;
+            }
             if(UI.Handler != null && UI.Handler.HasUnsavedChanges)
             {
                 if(UI.Handler.IsConnected)
@@ -457,6 +499,7 @@ Selected.Hierarchies.ForEach(item => item.TranslatedDisplayFolders.SetAll(item.D
                 if (e.Cancel) return;
             }
 
+            SaveWindowPlacement();
             SaveTreeViewColumnPreferences();
         }
 
@@ -567,13 +610,6 @@ Selected.Hierarchies.ForEach(item => item.TranslatedDisplayFolders.SetAll(item.D
             }
         }
 
-        private void actUndoRedo_Execute(object sender, EventArgs e)
-        {
-            if(!txtExpression.Focused) UI.ExpressionEditor_CancelEdit();
-            //propertyGrid1.Refresh();
-            //tvModel.Refresh();
-        }
-
         private void txtFilter_KeyDown(object sender, KeyEventArgs e)
         {
             if (e.KeyCode == Keys.Enter && !string.IsNullOrWhiteSpace(txtFilter.Text))
@@ -603,13 +639,6 @@ Selected.Hierarchies.ForEach(item => item.TranslatedDisplayFolders.SetAll(item.D
         private void actExpressionCancelEdit_UpdateEx(object sender, UpdateExEventArgs e)
         {
             e.Enabled = UI.ExpressionEditor_IsEditing;
-        }
-
-        private void lblCurrentMeasure_Paint(object sender, PaintEventArgs e)
-        {
-            var c = Color.FromArgb(100, 100, 100);
-            var s = ButtonBorderStyle.Solid;
-            ControlPaint.DrawBorder(e.Graphics, lblCurrentMeasure.DisplayRectangle, c, 1, s, c, 1, s, c, 1, s, c, 0, ButtonBorderStyle.None);
         }
 
         private void actExpression_UpdateEx(object sender, UpdateExEventArgs e)
@@ -762,7 +791,7 @@ Selected.Hierarchies.ForEach(item => item.TranslatedDisplayFolders.SetAll(item.D
                     ScriptEngine.CompileMacros(new MacrosJson() { Actions = new[] { act } });
                     if (ScriptEngine.MacroErrors)
                     {
-                        MessageBox.Show("Compile failed, macro contains errors and cannot be saved.", "Validation failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        AppMessageBox.Show("Compile failed, macro contains errors and cannot be saved.", "Validation failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
                         return;
                     }
 
@@ -1070,6 +1099,20 @@ Selected.Hierarchies.ForEach(item => item.TranslatedDisplayFolders.SetAll(item.D
 
         protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
         {
+            if (keyData == (Keys.Control | Keys.S))
+            {
+                SaveFromKeyboard();
+                return true;
+            }
+
+            if (keyData == (Keys.Control | Keys.W))
+            {
+                if (tabCodeEditors.SelectedTab == pgExpressionEditor) UI.CloseActiveExpressionTab();
+                else if (tabCodeEditors.SelectedTab == pgDaxScript) daxQueryTabs.CloseActiveTab();
+                else return base.ProcessCmdKey(ref msg, keyData);
+                return true;
+            }
+
             if (keyData == Keys.F5 && tabCodeEditors.SelectedTab == pgDaxScript)
             {
                 _ = daxQueryEditor.ExecuteAsync();
@@ -1107,6 +1150,29 @@ Selected.Hierarchies.ForEach(item => item.TranslatedDisplayFolders.SetAll(item.D
 
 
             return base.ProcessCmdKey(ref msg, keyData);
+        }
+
+        private void SaveFromKeyboard()
+        {
+            if (tabCodeEditors.ContainsFocus)
+            {
+                if (tabCodeEditors.SelectedTab == pgDaxScript && daxQueryEditor != null)
+                {
+                    daxQueryTabs.SaveActiveScript();
+                    return;
+                }
+                if (tabCodeEditors.SelectedTab == pgCSharpScript && txtAdvanced.Enabled)
+                {
+                    btnSaveScript_Click(this, EventArgs.Empty);
+                    return;
+                }
+                if (tabCodeEditors.SelectedTab == pgExpressionEditor && UI.ExpressionEditor_Current != null)
+                {
+                    UI.ExpressionEditor_AcceptEdit();
+                    return;
+                }
+            }
+            if (actSave.Enabled) UI.Save();
         }
 
         private void actFind_UpdateEx(object sender, UpdateExEventArgs e)

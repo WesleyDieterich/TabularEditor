@@ -74,7 +74,7 @@ namespace TabularEditor.UI
                 catch (Exception ex)
                 {
                     cancel = true;
-                    MessageBox.Show(ex.Message, "Error loading Model from disk", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    AppMessageBox.Show(ex.Message, "Error loading Model from disk", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
             }
 
@@ -92,6 +92,7 @@ namespace TabularEditor.UI
         {
             var newModelDialog = new NewModelDialog();
             if (newModelDialog.ShowDialog() == DialogResult.Cancel) return;
+            if (CancelDiscardingExpressionDrafts()) return;
 
             TabularModelHandler.Cleanup();
             if (Handler != null && File_SaveMode == ModelSourceType.Database) Handler.OnExternalChange -= Handler_OnExternalChange;
@@ -115,6 +116,7 @@ namespace TabularEditor.UI
         /// <returns>True if the currently loaded model has unsaved changed.</returns>
         public bool DiscardChangesCheck()
         {
+            if (CancelDiscardingExpressionDrafts()) return true;
             if (Handler != null && Handler.HasUnsavedChanges)
             {
                 if (MessageBox.Show("You have made changes to the model which have not yet been saved. Continue without saving changes?", "Unsaved changes", MessageBoxButtons.OKCancel, MessageBoxIcon.Question)
@@ -195,7 +197,7 @@ namespace TabularEditor.UI
 
         public void File_SaveAs()
         {
-            ExpressionEditor_AcceptEdit();
+            if (!ConfirmModelSave()) return;
 
             // Only show the "Use serialize options from annotations" checkbox when the current model has these annotations,
             // and not when switching between file/folder:
@@ -285,7 +287,7 @@ namespace TabularEditor.UI
 
         public void File_SaveAs_ToFolder()
         {
-            ExpressionEditor_AcceptEdit();
+            if (!ConfirmModelSave()) return;
 
             // Save as a Folder structure:
             var saveFormat = Preferences.Current.UseTMDL ? SaveFormat.TMDL : SaveFormat.TabularEditorFolder;
@@ -363,20 +365,19 @@ namespace TabularEditor.UI
         {
             if (e is SerializationException || 
                 e is Microsoft.AnalysisServices.Tabular.TomInternalException)
-                MessageBox.Show("Tabular Editor was unable to serialize the model to disk.\n\n" + e.Message, operationTitle, MessageBoxButtons.OK, MessageBoxIcon.Error);
+                AppMessageBox.Show("Tabular Editor was unable to serialize the model to disk.\n\n" + e.Message, operationTitle, MessageBoxButtons.OK, MessageBoxIcon.Error);
             else
                 throw e;
         }
 
         public void Save()
         {
-            ExpressionEditor_AcceptEdit();
-
             if (File_Current == null && File_SaveMode == ModelSourceType.File)
             {
                 File_SaveAs();
                 return;
             }
+            if (!ConfirmModelSave()) return;
 
             UI.StatusLabel.Text = "Saving...";
             using (new Hourglass())
@@ -391,7 +392,7 @@ namespace TabularEditor.UI
                     case ModelSourceType.TMDL:
                         if (GetLastDirChange(File_Current, File_LastWrite) > File_LastWrite)
                         {
-                            var mr = MessageBox.Show("Changes were made to the currently loaded folder structure after the model was loaded in Tabular Editor. Overwrite these changes?", "Overwriting folder structure changes", MessageBoxButtons.OKCancel, MessageBoxIcon.Warning);
+                            var mr = AppMessageBox.Show(UI.FormMain, "Changes were made to the currently loaded folder structure after the model was loaded in Tabular Editor. Overwrite these changes?", "Overwriting folder structure changes", MessageBoxButtons.OKCancel, MessageBoxIcon.Warning);
                             if (mr == DialogResult.Cancel) break;
                         }
                         try
@@ -421,7 +422,7 @@ namespace TabularEditor.UI
                     case ModelSourceType.Pbit:
                         if (File.GetLastWriteTime(File_Current) > File_LastWrite)
                         {
-                            var mr = MessageBox.Show("Changes were made to the currently loaded file after the model was loaded in Tabular Editor. Overwrite these changes?", "Overwriting file changes", MessageBoxButtons.OKCancel, MessageBoxIcon.Warning);
+                            var mr = AppMessageBox.Show(UI.FormMain, "Changes were made to the currently loaded file after the model was loaded in Tabular Editor. Overwrite these changes?", "Overwriting file changes", MessageBoxButtons.OKCancel, MessageBoxIcon.Warning);
                             if (mr == DialogResult.Cancel) break;
                         }
                         try
@@ -441,6 +442,15 @@ namespace TabularEditor.UI
                 
                 UpdateUIText();
             }
+        }
+
+        private bool ConfirmModelSave()
+        {
+            if (Handler == null) return false;
+            var destination = File_SaveMode == ModelSourceType.Database ? "the connected model" : "the model";
+            return AppMessageBox.Show(UI.FormMain, $"You are about to save changes to {destination}. Continue?",
+                "Save model", MessageBoxButtons.YesNo, MessageBoxIcon.Warning,
+                MessageBoxDefaultButton.Button2) == DialogResult.Yes;
         }
 
         private DateTime GetLastDirChange(string path)

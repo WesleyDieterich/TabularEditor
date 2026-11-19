@@ -301,8 +301,10 @@
     <Compile Include="TextServices\ExpressionParser.cs" />
     <Compile Include="UI\DaxIntelliSense.cs" />
     <Compile Include="UI\DaxQueryEditor.cs" />
+    <Compile Include="UI\DaxQueryTabs.cs" />
     <Compile Include="UI\DaxQueryWorkbook.cs" />
     <Compile Include="UI\AppTheme.cs" />
+    <Compile Include="UI\AppMessageBox.cs" />
     <Compile Include="UI\DarkScrollBar.cs" />
     <Compile Include="UI\DarkSelectorChrome.cs" />
     <Compile Include="UIServices\ModelTelemetry.cs" />
@@ -500,6 +502,7 @@
     <Compile Include="UI\UIController_ContextMenu.cs" />
     <Compile Include="UI\UIController_Database.cs" />
     <Compile Include="UI\UIController_ExpressionEditor.cs" />
+    <Compile Include="UI\UIController_ExpressionTabs.cs" />
     <Compile Include="UI\UIController_Files.cs" />
     <Compile Include="UI\UIController_PropertyGrid.cs" />
     <Compile Include="UI\UIController_ScriptEditor.cs" />

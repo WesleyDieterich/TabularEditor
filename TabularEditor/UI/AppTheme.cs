@@ -33,7 +33,10 @@ namespace TabularEditor.UI
         internal static bool IsDark => Preferences.Current.UseDarkTheme && !SystemInformation.HighContrast;
 
         private static readonly ConditionalWeakTable<Form, ThemeState> Themes = new ConditionalWeakTable<Form, ThemeState>();
+        private static readonly ConditionalWeakTable<DaxQueryEditor, ThemeState> QueryThemes =
+            new ConditionalWeakTable<DaxQueryEditor, ThemeState>();
         private static readonly ToolStripRenderer Renderer = new DarkRenderer();
+        private static readonly ToolStripRenderer CompletionRenderer = new AutocompleteRenderer();
         private static readonly ConditionalWeakTable<TextStyle, Brush> LightBrushes = new ConditionalWeakTable<TextStyle, Brush>();
 
         internal static void ApplySyntaxColor(Style style, Brush darkBrush)
@@ -43,15 +46,61 @@ namespace TabularEditor.UI
             textStyle.ForeBrush = IsDark ? darkBrush : lightBrush;
         }
 
-        internal static void ApplyAutocomplete(AutocompleteMenu menu, Color selected, Color hovered)
+        internal static void ApplyAutocomplete(AutocompleteMenu menu)
         {
-            menu.BackColor = IsDark ? Raised : SystemColors.Window;
-            menu.Items.BackColor = IsDark ? Raised : SystemColors.Window;
+            menu.Renderer = CompletionRenderer;
+            menu.DropShadowEnabled = false;
+            menu.BackColor = IsDark ? Surface : SystemColors.Window;
+            menu.Items.BackColor = menu.BackColor;
             menu.Items.ForeColor = IsDark ? Text : SystemColors.WindowText;
-            menu.SelectedColor = IsDark ? Selection : selected;
-            menu.HoveredColor = IsDark ? Border : hovered;
-            ApplyToolTip(menu.ToolTip);
+            // FastColoredTextBox uses a gradient for SelectedColor. Highlight the item itself instead.
+            menu.SelectedColor = Color.Transparent;
+            menu.HoveredColor = Color.Transparent;
+
+            var tip = menu.ToolTip;
+            tip.OwnerDraw = IsDark;
+            tip.BackColor = IsDark ? Raised : SystemColors.Window;
+            tip.ForeColor = IsDark ? Text : SystemColors.WindowText;
+            tip.Draw -= DrawAutocompleteToolTip;
+            tip.Draw += DrawAutocompleteToolTip;
         }
+
+        private static Color CompletionBorder => IsDark ? Border : SystemColors.ControlDark;
+
+        private static void DrawAutocompleteToolTip(object sender, DrawToolTipEventArgs e)
+        {
+            e.DrawBackground();
+            using (var pen = new Pen(CompletionBorder))
+                e.Graphics.DrawRectangle(pen, e.Bounds.Left, e.Bounds.Top, e.Bounds.Width - 1, e.Bounds.Height - 1);
+            e.DrawText(TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix);
+        }
+
+        private sealed class AutocompleteRenderer : ToolStripSystemRenderer
+        {
+            protected override void OnRenderToolStripBackground(ToolStripRenderEventArgs e)
+            {
+                using (var brush = new SolidBrush(e.ToolStrip.BackColor))
+                    e.Graphics.FillRectangle(brush, e.AffectedBounds);
+            }
+
+            protected override void OnRenderToolStripBorder(ToolStripRenderEventArgs e)
+            {
+                var size = e.ToolStrip.ClientSize;
+                using (var pen = new Pen(CompletionBorder))
+                    e.Graphics.DrawRectangle(pen, 0, 0, size.Width - 1, size.Height - 1);
+            }
+        }
+
+        internal static Color AutocompleteItemBackground(AutocompleteItem item)
+        {
+            if (item.Parent?.Items.FocussedItem != item) return Color.Transparent;
+            return SystemInformation.HighContrast ? SystemColors.Highlight
+                : IsDark ? Selection : Color.FromArgb(222, 235, 249);
+        }
+
+        internal static Color AutocompleteItemForeground(AutocompleteItem item) =>
+            SystemInformation.HighContrast && item.Parent?.Items.FocussedItem == item
+                ? SystemColors.HighlightText : Color.Transparent;
 
         internal static void ApplyOpenForms(object sender, EventArgs e)
         {
@@ -90,6 +139,30 @@ namespace TabularEditor.UI
                 form.ResumeLayout(true);
                 form.Invalidate(true);
             }
+        }
+
+        internal static void ApplyQueryEditor(DaxQueryEditor editor)
+        {
+            if (IsDark)
+                QueryThemes.GetValue(editor, query =>
+                {
+                    var state = new ThemeState();
+                    state.Apply(query);
+                    return state;
+                });
+            else if (QueryThemes.TryGetValue(editor, out var previous))
+            {
+                previous.Restore();
+                QueryThemes.Remove(editor);
+            }
+        }
+
+        internal static void ApplyContextMenu(ContextMenuStrip menu)
+        {
+            if (IsDark) menu.Renderer = Renderer;
+            else menu.RenderMode = ToolStripRenderMode.ManagerRenderMode;
+            menu.BackColor = IsDark ? Surface : SystemColors.Control;
+            menu.ForeColor = IsDark ? Text : SystemColors.ControlText;
         }
 
         private static void UpdateTitleBar(object sender, EventArgs e)
@@ -153,7 +226,8 @@ namespace TabularEditor.UI
                 if (control is PropertyGrid || control is FastColoredTextBox)
                     ApplyNestedScrollBars(control);
                 else
-                    foreach (Control child in control.Controls) Apply(child);
+                    foreach (Control child in control.Controls)
+                        if (!(child is DaxQueryEditor)) Apply(child);
                 if (control is ToolStrip hostedStrip)
                 {
                     foreach (var host in hostedStrip.Items.OfType<ToolStripControlHost>()) Apply(host.Control);
@@ -461,6 +535,15 @@ namespace TabularEditor.UI
     internal sealed class ThemedTabControl : TabControl
     {
         private bool drawDarkBackground;
+        private bool editorTabStyle;
+
+        internal void UseEditorTabStyle()
+        {
+            editorTabStyle = true;
+            ItemSize = new Size(0, 27);
+            Padding = new Point(10, 3);
+            DrawDarkBackground = drawDarkBackground;
+        }
 
         internal bool DrawDarkBackground
         {
@@ -468,19 +551,37 @@ namespace TabularEditor.UI
             set
             {
                 drawDarkBackground = value;
-                SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer, value);
+                SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer,
+                    value || editorTabStyle);
                 Invalidate();
             }
         }
 
         protected override void OnPaintBackground(PaintEventArgs e)
         {
-            if (drawDarkBackground) e.Graphics.Clear(AppTheme.Surface);
+            if (editorTabStyle) e.Graphics.Clear(DaxQueryTabs.TabBackColor(false));
+            else if (drawDarkBackground) e.Graphics.Clear(AppTheme.Surface);
             else base.OnPaintBackground(e);
         }
 
         protected override void OnPaint(PaintEventArgs e)
         {
+            if (editorTabStyle)
+            {
+                using (var separator = new Pen(DaxQueryTabs.TabSeparatorColor))
+                    for (var i = 0; i < TabCount; i++)
+                    {
+                        var bounds = GetTabRect(i);
+                        using (var background = new SolidBrush(DaxQueryTabs.TabBackColor(i == SelectedIndex)))
+                            e.Graphics.FillRectangle(background, bounds);
+                        TextRenderer.DrawText(e.Graphics, TabPages[i].Text, Font, bounds,
+                            AppTheme.IsDark ? AppTheme.Text : SystemColors.ControlText,
+                            TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter |
+                            TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix);
+                        e.Graphics.DrawLine(separator, bounds.Right - 1, bounds.Top + 4, bounds.Right - 1, bounds.Bottom - 5);
+                    }
+                return;
+            }
             if (!drawDarkBackground)
             {
                 base.OnPaint(e);
@@ -493,7 +594,7 @@ namespace TabularEditor.UI
         protected override void OnSelectedIndexChanged(EventArgs e)
         {
             base.OnSelectedIndexChanged(e);
-            if (drawDarkBackground) Invalidate();
+            if (drawDarkBackground || editorTabStyle) Invalidate();
         }
     }
 }

@@ -51,7 +51,7 @@ namespace TabularEditor.UI.Dialogs
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show(ex.Message, "Error loading Rule File from URL", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    AppMessageBox.Show(ex.Message, "Error loading Rule File from URL", MessageBoxButtons.OK, MessageBoxIcon.Error);
                     e.Cancel = true;
                 }
             }

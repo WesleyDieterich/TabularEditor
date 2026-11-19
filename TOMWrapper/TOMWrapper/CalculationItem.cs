@@ -143,10 +143,11 @@ namespace TabularEditor.TOMWrapper
         [ReadOnly(true), Category("Metadata"), DisplayName("Object Type")]
         public string ObjectTypeName => "Calculation Item Collection";
 
+        // The collection node has a fixed name and no property changes to report.
         event PropertyChangedEventHandler INotifyPropertyChanged.PropertyChanged
         {
-            add { throw new NotImplementedException(); }
-            remove { throw new NotImplementedException(); }
+            add { }
+            remove { }
         }
 
         /// <summary>
