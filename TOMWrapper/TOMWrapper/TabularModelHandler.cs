@@ -338,6 +338,9 @@ namespace TabularEditor.TOMWrapper
         }
 
         public bool IsConnected { get { return Version != -1; } }
+        internal string GetQueryConnectionString(string databaseName) =>
+            TabularConnection.GetConnectionString(serverName, applicationName, databaseName);
+
         public long Version { get; private set; } = -1;
 
         public bool HasUnsavedChanges

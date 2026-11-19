@@ -41,7 +41,7 @@ namespace TabularEditor
 
             SetupUIController();
             daxQueryEditor = new DaxQueryEditor(() => UI.Handler);
-            pgDaxScript = new TabPage("DAX Script");
+            pgDaxScript = new TabPage("DAX Query");
             pgDaxScript.Controls.Add(daxQueryEditor);
             tabCodeEditors.TabPages.Add(pgDaxScript);
             UI.ModelLoaded += (sender, args) => daxQueryEditor.ClearResults();
@@ -1072,7 +1072,7 @@ Selected.Hierarchies.ForEach(item => item.TranslatedDisplayFolders.SetAll(item.D
         {
             if (keyData == Keys.F5 && tabCodeEditors.SelectedTab == pgDaxScript)
             {
-                daxQueryEditor.Execute();
+                _ = daxQueryEditor.ExecuteAsync();
                 return true;
             }
 

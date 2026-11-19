@@ -6,11 +6,14 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Text.RegularExpressions;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 using TabularEditor.TextServices;
 using TabularEditor.UI.Extensions;
 using TabularEditor.UIServices;
+using CancellationTokenSource = System.Threading.CancellationTokenSource;
 using CodeEditor = TabularEditor.UI.Extensions.FCTB.FastColoredTextBox;
+using Database = TabularEditor.TOMWrapper.Database;
 using TabularModelHandler = TabularEditor.TOMWrapper.TabularModelHandler;
 
 namespace TabularEditor.UI
@@ -22,8 +25,22 @@ namespace TabularEditor.UI
         private readonly DaxIntelliSense intelliSense;
         private readonly SplitContainer split;
         private readonly DataGridView grid;
+        private readonly Font typeIconFont;
+        private readonly Label typeToolTip = new Label
+        {
+            AutoSize = true, Visible = false, BorderStyle = BorderStyle.FixedSingle,
+            Padding = new Padding(5, 2, 5, 2)
+        };
         private readonly ToolStripComboBox resultSelector;
         private readonly ToolStripLabel rowCount;
+        private readonly ToolStripButton runButton;
+        private readonly ToolStripButton cancelButton;
+        private readonly ToolStripControlHost exportControl;
+        private readonly ToolStrip collapsedResultsCommands;
+        private readonly Timer executionTimer = new Timer { Interval = 100 };
+        private readonly Stopwatch executionClock = new Stopwatch();
+        private CancellationTokenSource runningQuery;
+        private Task<string> cancellationRequest;
         private readonly Dictionary<int, HashSet<object>> filters = new Dictionary<int, HashSet<object>>();
         private readonly Dictionary<int, ColumnCondition> conditions = new Dictionary<int, ColumnCondition>();
         private int sortColumn = -1;
@@ -64,11 +81,23 @@ namespace TabularEditor.UI
             editor.Text = "EVALUATE\r\n";
 
             var commands = new ToolStrip { GripStyle = ToolStripGripStyle.Hidden };
-            commands.Items.Add("Run (F5)", Resources.Run, (sender, args) => Execute()).ImageTransparentColor = Color.Magenta;
+            runButton = new ToolStripButton("Run (F5)", Resources.Run, async (sender, args) => await ExecuteAsync())
+            {
+                ImageTransparentColor = Color.Magenta
+            };
+            cancelButton = new ToolStripButton("Cancel", null, (sender, args) => CancelExecution()) { Enabled = false };
+            commands.Items.Add(runButton);
+            commands.Items.Add(cancelButton);
             split.Panel1.Controls.Add(editor);
             split.Panel1.Controls.Add(commands);
+            collapsedResultsCommands = new ToolStrip
+            {
+                Dock = DockStyle.Bottom, GripStyle = ToolStripGripStyle.Hidden, Visible = false
+            };
+            collapsedResultsCommands.Items.Add(ResultsArrow(true, "Show results", (sender, args) => ShowResultsPane()));
+            split.Panel1.Controls.Add(collapsedResultsCommands);
 
-            grid = new DataGridView
+            grid = new ResultGrid
             {
                 Dock = DockStyle.Fill, ReadOnly = true, VirtualMode = true,
                 AllowUserToAddRows = false, AllowUserToDeleteRows = false, AllowUserToResizeRows = false,
@@ -76,6 +105,8 @@ namespace TabularEditor.UI
                 AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None, ShowCellToolTips = true
             };
             grid.ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.Single;
+            grid.ColumnHeadersHeight += (int)Math.Round(4 * DeviceDpi / 96.0);
+            typeIconFont = new Font(grid.Font.FontFamily, grid.Font.SizeInPoints * 0.8f, FontStyle.Regular);
             grid.CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal;
             grid.RowTemplate.Height += (int)Math.Round(4 * DeviceDpi / 96.0);
             grid.CellValueNeeded += (sender, args) =>
@@ -84,7 +115,12 @@ namespace TabularEditor.UI
                     args.ColumnIndex >= 0 && args.ColumnIndex < visibleRows[args.RowIndex].Table.Columns.Count)
                     args.Value = visibleRows[args.RowIndex][args.ColumnIndex];
             };
-            grid.CellPainting += PaintHeaderFilter;
+            grid.CellPainting += PaintColumnHeader;
+            grid.MouseMove += UpdateTypeToolTip;
+            grid.MouseLeave += (sender, args) => HideTypeToolTip();
+            grid.Scroll += (sender, args) => HideTypeToolTip();
+            grid.ColumnWidthChanged += (sender, args) => HideTypeToolTip();
+            grid.VisibleChanged += (sender, args) => { if (!grid.Visible) HideTypeToolTip(); };
             grid.CellMouseDown += OpenHeaderFilter;
             resultSelector = new ToolStripComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Visible = false };
             resultSelector.SelectedIndexChanged += (sender, args) =>
@@ -93,33 +129,42 @@ namespace TabularEditor.UI
                     ShowTable(results.Tables[resultSelector.SelectedIndex]);
             };
             rowCount = new ToolStripLabel();
-            var resultCommands = new ToolStrip { GripStyle = ToolStripGripStyle.Hidden };
+            var resultCommands = new AppTheme.BorderlessToolStrip { GripStyle = ToolStripGripStyle.Hidden };
             var exportButton = new Button
             {
                 Text = "Export to Excel",
                 AutoSize = true,
                 AutoSizeMode = AutoSizeMode.GrowAndShrink,
-                Padding = new Padding(10, 3, 10, 3),
+                Padding = new Padding(8, 0, 8, 0),
                 UseVisualStyleBackColor = true
             };
             exportButton.Click += (sender, args) => Export();
-            resultCommands.Items.Add(new ToolStripControlHost(exportButton)
+            exportControl = new ToolStripControlHost(exportButton)
             {
-                Margin = new Padding(4, 3, 8, 3)
-            });
+                Margin = new Padding(4, 1, 8, 1), Enabled = false
+            };
+            resultCommands.Items.Add(exportControl);
             resultCommands.Items.Add(resultSelector);
             resultCommands.Items.Add(rowCount);
-            resultCommands.Items.Add(new ToolStripButton("Hide results", null, (sender, args) => split.Panel2Collapsed = true)
+            resultCommands.Items.Add(ResultsArrow(false, "Hide results", (sender, args) =>
             {
-                Alignment = ToolStripItemAlignment.Right
-            });
+                split.Panel2Collapsed = true;
+                collapsedResultsCommands.Show();
+            }));
             split.Panel2.Controls.Add(grid);
+            split.Panel2.Controls.Add(new Panel { Dock = DockStyle.Top, Height = split.SplitterWidth });
             split.Panel2.Controls.Add(resultCommands);
+            split.Panel2.Controls.Add(typeToolTip);
+            typeToolTip.BringToFront();
             Controls.Add(split);
+            executionTimer.Tick += (sender, args) => UpdateExecutionStatus();
 
             Disposed += (sender, args) =>
             {
+                CancelExecution();
+                executionTimer.Dispose();
                 highlight.Dispose();
+                typeIconFont.Dispose();
                 results?.Dispose();
                 codeFont.Dispose();
             };
@@ -128,6 +173,8 @@ namespace TabularEditor.UI
         public void ApplyTheme()
         {
             intelliSense.ApplyTheme();
+            typeToolTip.BackColor = AppTheme.IsDark ? AppTheme.Raised : SystemColors.Info;
+            typeToolTip.ForeColor = AppTheme.IsDark ? AppTheme.Text : SystemColors.InfoText;
             ScheduleHighlight();
         }
 
@@ -148,8 +195,17 @@ namespace TabularEditor.UI
 
         public void ClearResults()
         {
-            filterPopup?.Close();
+            CancelExecution();
+            executionTimer.Stop();
+            ResetResults();
+            collapsedResultsCommands.Hide();
             split.Panel2Collapsed = true;
+        }
+
+        private void ResetResults()
+        {
+            HideTypeToolTip();
+            filterPopup?.Close();
             grid.RowCount = 0;
             grid.Columns.Clear();
             table = null;
@@ -161,17 +217,20 @@ namespace TabularEditor.UI
             results?.Dispose();
             results = null;
             resultSelector.Items.Clear();
+            resultSelector.Visible = false;
+            exportControl.Enabled = false;
             rowCount.Text = string.Empty;
             executedQuery = string.Empty;
             executionTime = TimeSpan.Zero;
         }
 
-        public void Execute()
+        public async Task ExecuteAsync()
         {
+            if (runningQuery != null) return;
             var handler = getHandler();
             if (handler?.IsConnected != true)
             {
-                MessageBox.Show(this, "Connect to a semantic model before running a DAX query.", "DAX Script",
+                MessageBox.Show(this, "Connect to a semantic model before running a DAX query.", "DAX Query",
                     MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
@@ -184,33 +243,110 @@ namespace TabularEditor.UI
             if (!string.Equals(firstToken, "EVALUATE", StringComparison.OrdinalIgnoreCase) &&
                 !string.Equals(firstToken, "DEFINE", StringComparison.OrdinalIgnoreCase))
             {
-                MessageBox.Show(this, "Select or enter a DAX query that starts with EVALUATE or DEFINE.", "DAX Script",
+                MessageBox.Show(this, "Select or enter a DAX query that starts with EVALUATE or DEFINE.", "DAX Query",
                     MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
 
             intelliSense.Close();
-            DataSet data;
-            var stopwatch = Stopwatch.StartNew();
+            var catalog = handler.Database.Name;
+            var connectionString = handler.GetQueryConnectionString(catalog);
+            ResetResults();
+            ShowResultsPane();
+            var cancellation = runningQuery = new CancellationTokenSource();
+            runButton.Enabled = false;
+            cancelButton.Enabled = true;
+            executionClock.Restart();
+            UpdateExecutionStatus();
+            executionTimer.Start();
+
+            DataSet data = null;
+            Exception failure = null;
             try
             {
-                // AMO shares the live session with the model editor. Execute on its owning thread.
-                using (new Hourglass())
-                    data = handler.Model.Database.ExecuteDax(query);
+                data = await Task.Run(() => Database.ExecuteDax(connectionString, catalog, query, cancellation.Token));
             }
             catch (Exception error)
             {
-                MessageBox.Show(this, error.Message, "DAX query failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                failure = error;
+            }
+
+            var elapsed = executionClock.Elapsed;
+            var cancelError = cancellationRequest == null ? null : await cancellationRequest;
+            var canceled = cancellationRequest != null;
+            cancellationRequest = null;
+            runningQuery = null;
+            cancellation.Dispose();
+            if (IsDisposed || Disposing)
+            {
+                data?.Dispose();
                 return;
             }
 
-            stopwatch.Stop();
-            ShowResults(data, query, stopwatch.Elapsed);
+            var showStatus = executionTimer.Enabled && ReferenceEquals(getHandler(), handler);
+            executionTimer.Stop();
+            executionClock.Stop();
+            runButton.Enabled = true;
+            cancelButton.Enabled = false;
+            if (!showStatus)
+            {
+                data?.Dispose();
+                return;
+            }
+
+            if (canceled)
+            {
+                data?.Dispose();
+                rowCount.Text = cancelError == null
+                    ? $"Query canceled  ·  {executionClock.Elapsed.TotalSeconds:N1} s"
+                    : $"Could not cancel on server: {cancelError}";
+            }
+            else if (failure != null)
+            {
+                rowCount.Text = $"Query failed  ·  {elapsed.TotalSeconds:N1} s";
+                MessageBox.Show(this, failure.Message, "DAX query failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            else ShowResults(data, query, elapsed);
+        }
+
+        private void CancelExecution()
+        {
+            if (runningQuery == null || cancellationRequest != null) return;
+            var cancellation = runningQuery;
+            cancellationRequest = Task.Run(() =>
+            {
+                try
+                {
+                    cancellation.Cancel();
+                    return (string)null;
+                }
+                catch (Exception error)
+                {
+                    return error.GetBaseException().Message;
+                }
+            });
+            if (IsDisposed || Disposing) return;
+            cancelButton.Enabled = false;
+            UpdateExecutionStatus();
+        }
+
+        private void UpdateExecutionStatus()
+        {
+            var elapsed = $"{executionClock.Elapsed.TotalSeconds:N1} s";
+            if (cancellationRequest == null)
+            {
+                rowCount.Text = elapsed;
+                return;
+            }
+
+            var status = "Canceling query…";
+            if (cancellationRequest?.Status == TaskStatus.RanToCompletion && cancellationRequest.Result != null)
+                status = "Server cancellation failed. Waiting for the query…";
+            rowCount.Text = $"{status}  ·  {elapsed}";
         }
 
         private void ShowResults(DataSet data, string query, TimeSpan elapsed)
         {
-            ClearResults();
             executedQuery = query;
             executionTime = elapsed;
             results = data;
@@ -218,16 +354,69 @@ namespace TabularEditor.UI
             resultSelector.Visible = results.Tables.Count > 1;
             if (results.Tables.Count > 0) resultSelector.SelectedIndex = 0;
             else rowCount.Text = "No result sets";
+        }
+
+        private void ShowResultsPane()
+        {
+            collapsedResultsCommands.Hide();
             split.Panel2Collapsed = false;
             if (!resultsPaneSized && split.Height >= split.Panel1MinSize + split.Panel2MinSize + split.SplitterWidth)
             {
-                split.SplitterDistance = Math.Min(split.Height * 3 / 5, split.Height - split.Panel2MinSize - split.SplitterWidth);
+                split.SplitterDistance = Math.Max(split.Panel1MinSize,
+                    Math.Min(split.Height * 3 / 5, split.Height - split.Panel2MinSize - split.SplitterWidth));
                 resultsPaneSized = true;
+            }
+        }
+
+        private static ToolStripButton ResultsArrow(bool pointsUp, string description, EventHandler click)
+        {
+            var button = new ToolStripButton(description, null, click)
+            {
+                Alignment = ToolStripItemAlignment.Right,
+                AutoSize = false,
+                Size = new Size(26, 20),
+                Margin = Padding.Empty,
+                DisplayStyle = ToolStripItemDisplayStyle.None,
+                AccessibleName = description,
+                AutoToolTip = false,
+                ToolTipText = description
+            };
+            button.Paint += (sender, args) =>
+            {
+                var scale = args.Graphics.DpiX / 96f;
+                var x = button.Width / 2f;
+                var y = button.Height / 2f;
+                var halfWidth = 5 * scale;
+                var halfHeight = (pointsUp ? -2.5f : 2.5f) * scale;
+                using (var pen = new Pen(button.ForeColor, 1.7f * scale))
+                {
+                    args.Graphics.DrawLines(pen, new[]
+                    {
+                        new PointF(x - halfWidth, y - halfHeight),
+                        new PointF(x, y + halfHeight),
+                        new PointF(x + halfWidth, y - halfHeight)
+                    });
+                }
+            };
+            return button;
+        }
+
+        private sealed class ResultGrid : DataGridView
+        {
+            protected override void OnPaint(PaintEventArgs e)
+            {
+                base.OnPaint(e);
+                if (!AppTheme.IsDark || !HorizontalScrollBar.Visible || !VerticalScrollBar.Visible) return;
+
+                // The space where the scroll bars meet is painted by the grid itself.
+                e.Graphics.FillRectangle(AppTheme.RaisedBrush, VerticalScrollBar.Left, HorizontalScrollBar.Top,
+                    VerticalScrollBar.Width, HorizontalScrollBar.Height);
             }
         }
 
         private void ShowTable(DataTable result)
         {
+            HideTypeToolTip();
             filterPopup?.Close();
             grid.RowCount = 0;
             grid.Columns.Clear();
@@ -236,14 +425,17 @@ namespace TabularEditor.UI
             sortColumn = -1;
             sortOrder = SortOrder.None;
             table = result;
+            exportControl.Enabled = true;
             foreach (DataColumn column in table.Columns)
             {
-                var name = DaxQueryWorkbook.ColumnName(column.ColumnName);
-                var width = TextRenderer.MeasureText(name, grid.Font).Width + 42;
+                var columnType = GetResultType(column);
+                var typeIcon = GetTypeIcon(columnType);
+                // The standard header renderer already leaves a small margin before its text.
+                var iconWidth = Math.Max(TypeIconInset, MeasureTypeIcon(typeIcon).Width + TypeIconInset - 6 * DeviceDpi / 96);
                 var gridColumn = new DataGridViewTextBoxColumn
                 {
-                    HeaderText = name, ValueType = column.DataType,
-                    Width = Math.Min(340, Math.Max(110, width)), MinimumWidth = 42,
+                    HeaderText = DaxQueryWorkbook.ColumnName(column.ColumnName), ValueType = column.DataType,
+                    Tag = (Icon: typeIcon, Name: GetTypeName(columnType)), MinimumWidth = iconWidth + FilterWidth + 16,
                     SortMode = DataGridViewColumnSortMode.NotSortable
                 };
                 var format = ResultFormat(column);
@@ -255,10 +447,19 @@ namespace TabularEditor.UI
                 var cultureName = getHandler()?.Model.Culture;
                 gridColumn.DefaultCellStyle.FormatProvider = string.IsNullOrEmpty(cultureName)
                     ? CultureInfo.CurrentCulture : CultureInfo.GetCultureInfo(cultureName);
-                gridColumn.HeaderCell.Style.Padding = new Padding(0, 0, FilterWidth + 12, 0);
+                gridColumn.HeaderCell.Style.Padding = new Padding(iconWidth, 0, FilterWidth + 12, 0);
                 grid.Columns.Add(gridColumn);
             }
             ApplyFilters();
+            // Fit formatted values and headers while bounding the cost for large virtual result sets.
+            grid.AutoResizeColumns(DataGridViewAutoSizeColumnsMode.DisplayedCells);
+            foreach (DataGridViewColumn column in grid.Columns)
+            {
+                var headerStyle = column.HeaderCell.InheritedStyle;
+                var headerWidth = TextRenderer.MeasureText(column.HeaderText, headerStyle.Font).Width +
+                    headerStyle.Padding.Horizontal + Math.Max(6, 6 * DeviceDpi / 96);
+                column.Width = Math.Max(column.Width, Math.Min(headerWidth, 65536));
+            }
         }
 
         private void ApplyFilters()
@@ -284,6 +485,10 @@ namespace TabularEditor.UI
         }
 
         private int FilterWidth => Math.Max(16, 19 * DeviceDpi / 96);
+        private int TypeIconInset => Math.Max(5, 5 * DeviceDpi / 96);
+        private int TypeIconHoverPadding => Math.Max(2, 2 * DeviceDpi / 96);
+        private const TextFormatFlags TypeIconTextFlags = TextFormatFlags.SingleLine | TextFormatFlags.NoPadding |
+            TextFormatFlags.NoPrefix | TextFormatFlags.PreserveGraphicsClipping;
 
         private static int CompareValues(object left, object right)
         {
@@ -333,10 +538,53 @@ namespace TabularEditor.UI
         private Rectangle FilterButton(Rectangle header) =>
             new Rectangle(header.Right - FilterWidth - 1, header.Top, FilterWidth, header.Height);
 
-        private void PaintHeaderFilter(object sender, DataGridViewCellPaintingEventArgs args)
+        private Size MeasureTypeIcon(string icon) =>
+            TextRenderer.MeasureText(icon, typeIconFont, new Size(int.MaxValue, int.MaxValue), TypeIconTextFlags);
+
+        private Rectangle TypeIconBounds(Rectangle header, string icon)
+        {
+            var size = MeasureTypeIcon(icon);
+            return new Rectangle(header.Left + TypeIconInset,
+                header.Top + (header.Height - size.Height) / 2, size.Width, size.Height);
+        }
+
+        private void UpdateTypeToolTip(object sender, MouseEventArgs args)
+        {
+            var hit = grid.HitTest(args.X, args.Y);
+            if (hit.Type == DataGridViewHitTestType.ColumnHeader)
+            {
+                var type = ((string Icon, string Name))grid.Columns[hit.ColumnIndex].Tag;
+                var header = grid.GetCellDisplayRectangle(hit.ColumnIndex, -1, false);
+                var bounds = TypeIconBounds(header, type.Icon);
+                var iconRight = bounds.Right;
+                bounds.Inflate(TypeIconHoverPadding, TypeIconHoverPadding);
+                bounds.Intersect(Rectangle.FromLTRB(header.Left, header.Top, iconRight, header.Bottom));
+                if (bounds.Contains(args.Location))
+                {
+                    typeToolTip.Text = type.Name;
+                    typeToolTip.Location = new Point(
+                        Math.Max(0, Math.Min(grid.Left + bounds.Left, split.Panel2.ClientSize.Width - typeToolTip.Width)),
+                        grid.Top + header.Bottom + 2);
+                    typeToolTip.Show();
+                    return;
+                }
+            }
+            HideTypeToolTip();
+        }
+
+        private void HideTypeToolTip() => typeToolTip.Hide();
+
+        private void PaintColumnHeader(object sender, DataGridViewCellPaintingEventArgs args)
         {
             if (args.RowIndex != -1 || args.ColumnIndex < 0) return;
             args.Paint(args.ClipBounds, args.PaintParts);
+            var type = ((string Icon, string Name))grid.Columns[args.ColumnIndex].Tag;
+            var foreground = args.CellStyle.ForeColor;
+            var background = args.CellStyle.BackColor;
+            var iconColor = Color.FromArgb((foreground.R * 2 + background.R) / 3,
+                (foreground.G * 2 + background.G) / 3, (foreground.B * 2 + background.B) / 3);
+            TextRenderer.DrawText(args.Graphics, type.Icon, typeIconFont,
+                TypeIconBounds(args.CellBounds, type.Icon), iconColor, TypeIconTextFlags);
             var button = FilterButton(args.CellBounds);
             var color = filters.ContainsKey(args.ColumnIndex) || conditions.ContainsKey(args.ColumnIndex)
                 ? (AppTheme.IsDark ? AppTheme.Accent : SystemColors.Highlight)
@@ -599,6 +847,46 @@ namespace TabularEditor.UI
                 hasValue = true;
             }
             return hasValue;
+        }
+
+        private static Type GetResultType(DataColumn column)
+        {
+            if (column.DataType != typeof(object)) return column.DataType;
+
+            // Some XMLA results declare Object even when every nonblank value has the same type.
+            Type type = null;
+            foreach (DataRow row in column.Table.Rows)
+            {
+                if (row.IsNull(column)) continue;
+                var valueType = row[column].GetType();
+                if (type != null && type != valueType) return typeof(object);
+                type = valueType;
+            }
+            return type ?? typeof(object);
+        }
+
+        private static string GetTypeIcon(Type type)
+        {
+            if (type == typeof(DateTime) || type == typeof(DateTimeOffset)) return "▦";
+            if (type == typeof(TimeSpan)) return "◷";
+            if (type == typeof(bool)) return "✓";
+            if (type == typeof(string) || type == typeof(char)) return "abc";
+            if (type == typeof(decimal) || type == typeof(double) || type == typeof(float)) return "1.2";
+            if (IsNumeric(type)) return "#";
+            if (type == typeof(Guid)) return "ID";
+            if (type == typeof(byte[])) return "01";
+            return "?";
+        }
+
+        private static string GetTypeName(Type type)
+        {
+            if (type == typeof(DateTime)) return "Date/time";
+            if (type == typeof(DateTimeOffset)) return "Date/time with offset";
+            if (type == typeof(TimeSpan)) return "Duration";
+            if (type == typeof(string)) return "Text";
+            if (type == typeof(bool)) return "Boolean";
+            if (type == typeof(byte[])) return "Binary";
+            return type.Name;
         }
 
         private static bool IsNumeric(Type type)

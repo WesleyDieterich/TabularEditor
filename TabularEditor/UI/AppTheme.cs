@@ -345,6 +345,8 @@ namespace TabularEditor.UI
             e.DrawFocusRectangle();
         }
 
+        internal sealed class BorderlessToolStrip : ToolStrip { }
+
         private sealed class DarkRenderer : ToolStripProfessionalRenderer
         {
             private readonly ConditionalWeakTable<Image, Image> softenedIcons = new ConditionalWeakTable<Image, Image>();
@@ -353,6 +355,8 @@ namespace TabularEditor.UI
 
             protected override void OnRenderToolStripBorder(ToolStripRenderEventArgs e)
             {
+                if (e.ToolStrip is BorderlessToolStrip) return;
+
                 if (e.ToolStrip is StatusStrip)
                 {
                     var bounds = e.AffectedBounds;

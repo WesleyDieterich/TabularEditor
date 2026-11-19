@@ -5,6 +5,7 @@ using System.ComponentModel;
 using System.Data;
 using System.Diagnostics;
 using System.Linq;
+using System.Threading;
 using System.Xml.Linq;
 using TabularEditor.PropertyGridUI;
 using TabularEditor.TOMWrapper.Undo;
@@ -77,18 +78,25 @@ namespace TabularEditor.TOMWrapper
         {
             if (TOMDatabase?.Server == null) throw new NotSupportedException("Cannot execute queries when not connected to Analysis Services");
 
-            var xmla = new XElement("Statement", dax).ToString();
             CloseReader();
-            LastOpenedReader = TOMDatabase.Server.ExecuteReader(
+            LastOpenedReader = ExecuteDaxReader(TOMDatabase.Server, TOMDatabase.Name, dax);
+            return LastOpenedReader;
+        }
+
+        private static AmoDataReader ExecuteDaxReader(TOM.Server server, string catalog, string dax)
+        {
+            var xmla = new XElement("Statement", dax).ToString();
+            var reader = server.ExecuteReader(
                 xmla,
                 out Microsoft.AnalysisServices.XmlaResultCollection results,
-                new Dictionary<string, string> { { "Catalog", TOMDatabase.Name } });
+                new Dictionary<string, string> { { "Catalog", catalog } });
             if (results != null && results.ContainsErrors)
             {
                 var errorMessage = results[0].Messages.OfType<Microsoft.AnalysisServices.XmlaError>().FirstOrDefault()?.Description;
+                reader?.Dispose();
                 throw new DaxQueryException(errorMessage);
             }
-            return LastOpenedReader;
+            return reader;
         }
 
         private Microsoft.AnalysisServices.AmoDataReader LastOpenedReader;
@@ -105,13 +113,43 @@ namespace TabularEditor.TOMWrapper
         [IntelliSense("Executes the specified DAX query against the connected database and returns a data set containing the result")]
         public DataSet ExecuteDax(string dax)
         {
+            using (var reader = (AmoDataReader)ExecuteReader(dax))
+                return ReadDaxResults(reader);
+        }
+
+        internal static DataSet ExecuteDax(string connectionString, string catalog, string dax, CancellationToken cancellation)
+        {
+            cancellation.ThrowIfCancellationRequested();
+            // The query owns its session so model editing can continue while it runs.
+            using (var server = new TOM.Server())
+            {
+                server.Connect(connectionString, propertiesOnly: true);
+                using (cancellation.Register(server.CancelCommand))
+                {
+                    cancellation.ThrowIfCancellationRequested();
+                    using (var reader = ExecuteDaxReader(server, catalog, dax))
+                    {
+                        cancellation.ThrowIfCancellationRequested();
+                        return ReadDaxResults(reader);
+                    }
+                }
+            }
+        }
+
+        private static DataSet ReadDaxResults(AmoDataReader reader)
+        {
             var dataSet = new DataSet();
-            using (var reader = ExecuteReader(dax) as AmoDataReader)
+            try
             {
                 var adapter = new AmoDataAdapter(reader);
                 adapter.Fill(dataSet);
+                return dataSet;
             }
-            return dataSet;
+            catch
+            {
+                dataSet.Dispose();
+                throw;
+            }
         }
 
         /// <summary>
