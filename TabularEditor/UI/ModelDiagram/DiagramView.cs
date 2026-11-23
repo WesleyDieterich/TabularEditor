@@ -431,11 +431,17 @@ namespace TabularEditor.UI.ModelDiagram
 
         #region Drag and drop from the model tree
 
-        /// <summary>Tables in a drag that started in the model tree (tables, or anything inside one).</summary>
+        /// <summary>
+        /// Tables in a drag that started in the model tree. The tree publishes what it is
+        /// dragging for the whole drag; the tree nodes in the drag data are only a fallback,
+        /// since the tree removes them once the mouse leaves it.
+        /// </summary>
         private static List<Table> DraggedTables(IDataObject data)
         {
+            var fromTree = UIController.Current?.TreeDragObjects.OfType<Table>().ToList();
+            if (fromTree != null && fromTree.Count > 0) return fromTree.Distinct().ToList();
             if (!(data?.GetData(typeof(TreeNodeAdv[])) is TreeNodeAdv[] nodes)) return new List<Table>();
-            return nodes.Select(n => n.Tag).OfType<Table>().Distinct().ToList();
+            return nodes.Where(n => n != null).Select(n => n.Tag).OfType<Table>().Distinct().ToList();
         }
 
         private void Canvas_DragOver(object sender, DragEventArgs e)
@@ -445,6 +451,8 @@ namespace TabularEditor.UI.ModelDiagram
             e.Effect = any ? DragDropEffects.Copy : DragDropEffects.None;
             if (layout.IsAllTables && tables.Count > 0)
                 status.Text = "\"All tables\" already shows every table. Drop on a custom layout.";
+            else if (tables.Count > 0 && !any)
+                status.Text = tables.Count == 1 ? $"{tables[0].Name} is already in this layout." : "These tables are already in this layout.";
         }
 
         private void Canvas_DragDrop(object sender, DragEventArgs e)

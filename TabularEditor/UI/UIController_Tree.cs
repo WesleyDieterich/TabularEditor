@@ -192,6 +192,14 @@ namespace TabularEditor.UI
 
         TreeNodeAdv[] draggedNodes = null;
 
+        /// <summary>
+        /// The objects being dragged out of the model tree, while a drag is in progress; empty
+        /// otherwise. Other drop targets (such as the model diagram) should use this rather than
+        /// the drag data, because <see cref="TreeView_DragLeave"/> removes the tree nodes from
+        /// the drag data as soon as the mouse leaves the tree.
+        /// </summary>
+        public IReadOnlyList<ITabularNamedObject> TreeDragObjects { get; private set; } = new ITabularNamedObject[0];
+
         private void TreeView_DragLeave(object sender, EventArgs e)
         {
             if (Handler == null) return;
@@ -388,7 +396,15 @@ namespace TabularEditor.UI
             else Tree_CurrentDragObject.SetData(Serializer.SerializeObjects(Selection.OfType<TabularObject>()));
 
             Tree_CurrentDragObject.SetData(draggedNodes);
-            UI.TreeView.DoDragDrop(Tree_CurrentDragObject, DragDropEffects.Move | DragDropEffects.Copy);
+            TreeDragObjects = draggedNodes.Select(n => n.Tag).OfType<ITabularNamedObject>().ToList();
+            try
+            {
+                UI.TreeView.DoDragDrop(Tree_CurrentDragObject, DragDropEffects.Move | DragDropEffects.Copy);
+            }
+            finally
+            {
+                TreeDragObjects = new ITabularNamedObject[0];
+            }
             draggedNodes = null;
         }
 
