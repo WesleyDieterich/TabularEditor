@@ -78,7 +78,7 @@ namespace TabularEditor.UI
         /// <summary>
         /// The measure expression. Returns BLANK when nothing is filtered, so the measure does not
         /// force rows into visuals; otherwise one line per filtered column, e.g.
-        /// <c>'Product'[Color] = Black, Blue, Red, … (+5 more)</c>.
+        /// <c>'Product'[Color] = Black, Blue, Red, … (+5)</c>.
         /// </summary>
         public static string BuildExpression(IReadOnlyList<Column> columns, string indent = "")
         {
@@ -99,7 +99,7 @@ namespace TabularEditor.UI
                 Line($"        RETURN");
                 Line($"            {label}");
                 Line($"                & CONCATENATEX( TOPN( __MaxValues, VALUES( {col} ), {col}, ASC ), {col}, \", \", {col}, ASC )");
-                Line($"                & IF( __Count > __MaxValues, \", … (+\" & ( __Count - __MaxValues ) & \" more)\" )");
+                Line($"                & IF( __Count > __MaxValues, \", … (+\" & ( __Count - __MaxValues ) & \")\" )");
                 Line($"                & __NewLine");
                 Line($"    )");
             }
