@@ -304,6 +304,8 @@
     <Compile Include="UI\FilterCalendar.cs" />
     <Compile Include="UI\FilterDump.cs" />
     <Compile Include="UI\DaxQueryTabs.cs" />
+    <Compile Include="UI\EditorScrollBars.cs" />
+    <Compile Include="UI\EditorWordWrap.cs" />
     <Compile Include="UI\ModelDiagram\AutoLayout.cs" />
     <Compile Include="UI\ModelDiagram\DiagramCanvas.cs">
       <SubType>Component</SubType>

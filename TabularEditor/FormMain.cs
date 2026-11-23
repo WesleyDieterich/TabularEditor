@@ -295,6 +295,10 @@ Selected.Hierarchies.ForEach(item => item.TranslatedDisplayFolders.SetAll(item.D
             splitContainer2.BackColor = SystemColors.ControlLight;
             txtExpression.BorderStyle = BorderStyle.None;
             txtAdvanced.BorderStyle = BorderStyle.None;
+            EditorWordWrap.Attach(txtExpression);
+            EditorWordWrap.Attach(txtAdvanced);
+            EditorScrollBars.Attach(txtExpression);
+            EditorScrollBars.Attach(txtAdvanced);
         }
 
         private void ArrangeWorkspaceToolbars()
@@ -306,6 +310,12 @@ Selected.Hierarchies.ForEach(item => item.TranslatedDisplayFolders.SetAll(item.D
             var zoomMenu = new ToolStripMenuItem("Script zoom");
             zoomMenu.DropDownItems.Add(toolStripComboBox1);
             viewToolStripMenuItem.DropDownItems.Insert(1, zoomMenu);
+            var wordWrapMenu = new ToolStripMenuItem("Word Wrap", null, (sender, args) => EditorWordWrap.Toggle())
+            {
+                ShortcutKeyDisplayString = "Alt+Z"
+            };
+            EditorWordWrap.Changed += (sender, args) => wordWrapMenu.Checked = EditorWordWrap.Enabled;
+            viewToolStripMenuItem.DropDownItems.Insert(2, wordWrapMenu);
 
             var perspectiveMenu = new ToolStripMenuItem("Perspective");
             perspectiveMenu.DropDownItems.Add(cmbPerspective);
@@ -1236,6 +1246,12 @@ Selected.Hierarchies.ForEach(item => item.TranslatedDisplayFolders.SetAll(item.D
                 else if (pgExploreData != null && tabCodeEditors.SelectedTab == pgExploreData) exploreDataTabs.CloseActiveTab();
                 else if (pgRefreshHistory != null && tabCodeEditors.SelectedTab == pgRefreshHistory) refreshHistory.CloseSelected();
                 else return base.ProcessCmdKey(ref msg, keyData);
+                return true;
+            }
+
+            if (keyData == (Keys.Alt | Keys.Z))
+            {
+                EditorWordWrap.Toggle();
                 return true;
             }
 

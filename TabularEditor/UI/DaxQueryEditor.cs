@@ -85,6 +85,7 @@ namespace TabularEditor.UI
                 editor.TextChanged += (sender, args) => ScriptChanged?.Invoke(this, EventArgs.Empty);
                 editor.VisibleChanged += (sender, args) => { if (editor.Visible) ScheduleHighlight(); };
                 editor.Text = "EVALUATE\r\n";
+                EditorWordWrap.Attach(editor);
             }
 
             var commands = new ToolStrip { GripStyle = ToolStripGripStyle.Hidden };
@@ -99,6 +100,7 @@ namespace TabularEditor.UI
                 commands.Items.Add(runButton);
                 commands.Items.Add(cancelButton);
                 split.Panel1.Controls.Add(editor);
+                EditorScrollBars.Attach(editor);
             }
             split.Panel1.Controls.Add(commands);
             collapsedResultsCommands = new ToolStrip
