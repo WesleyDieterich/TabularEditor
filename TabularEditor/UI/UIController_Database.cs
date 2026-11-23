@@ -212,8 +212,11 @@ namespace TabularEditor.UI
                 var conflictInfo = Handler.CheckConflicts();
                 if (conflictInfo.Conflict)
                 {
-                    var res = AppMessageBox.Show(UI.FormMain, string.Format("Changes have been made to the deployed version of the model, since it was loaded into Tabular Editor.\n\nDeployed model version: {0} (changed {1})\nCurrent model version: {2}\n\nDo you want to overwrite the deployed model?",
-                        conflictInfo.DatabaseVersion, conflictInfo.DatabaseLastUpdate, conflictInfo.LoadedVersion),
+                    var res = AppMessageBox.Show(UI.FormMain,
+                        "The model on the service changed after you opened it in Tabular Editor.\n\n" +
+                        $"Service version: {conflictInfo.DatabaseVersion} (updated {conflictInfo.DatabaseLastUpdate:G})\n" +
+                        $"Version opened in Tabular Editor: {conflictInfo.LoadedVersion}\n\n" +
+                        "Overwrite the model on the service with your local changes?",
                         "Change conflict", MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2);
                     if (res == DialogResult.No) return;
                 }
@@ -251,11 +254,40 @@ namespace TabularEditor.UI
                 catch (Exception e)
                 {
                     AppMessageBox.Show(e.Message + "\n\nSave the model as a file to make sure you do not lose any work. In case the database connection was lost, you can still apply your changes to the database by using the \"Model > Deploy\" option.", "Could not save metadata changes to database", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    UI.TreeView.Refresh();
+                    return;
                 }
 
                 UI.TreeView.Refresh();
-
             }
+
+            OfferPendingCalculation();
+        }
+
+        private void OfferPendingCalculation()
+        {
+            Table[] tables;
+            try
+            {
+                var pending = new HashSet<string>(Handler.GetTablesPendingCalculation(), StringComparer.OrdinalIgnoreCase);
+                tables = Handler.Model.Tables.Where(table => pending.Contains(table.Name))
+                    .OrderBy(table => table.Name, StringComparer.CurrentCultureIgnoreCase).ToArray();
+            }
+            catch (Exception error)
+            {
+                AppMessageBox.Show(UI.FormMain, "Changes were saved. Could not check for pending calculations.\n\n" + error.Message,
+                    "Saved model", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+            if (tables.Length == 0) return;
+
+            var listed = string.Join("\n", tables.Take(12).Select(table => "• " + table.Name));
+            if (tables.Length > 12) listed += $"\n… and {tables.Length - 12} more";
+            var pendingTables = tables.Length == 1 ? "This table needs recalculation:" : $"{tables.Length} tables need recalculation:";
+            if (AppMessageBox.Show(UI.FormMain,
+                $"Changes were saved. {pendingTables}\n\n{listed}\n\nRun Calculate now?",
+                "Recalculate affected tables", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+                UI.FormMain.RefreshModelData(tables, RefreshType.Calculate, "After saving the model");
         }
     }
 }

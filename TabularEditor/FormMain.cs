@@ -28,8 +28,8 @@ namespace TabularEditor
         private readonly TabPage pgPivot;
         private DaxQueryTabs exploreDataTabs;
         private TabPage pgExploreData;
-        private RefreshHistory refreshHistory;
-        private TabPage pgRefreshHistory;
+        private readonly RefreshHistory refreshHistory;
+        private readonly TabPage pgRefreshHistory;
         private bool showExpressionProperties;
         private FormWindowState lastVisibleWindowState = FormWindowState.Maximized;
 
@@ -57,6 +57,10 @@ namespace TabularEditor
             pgPivot = new TabPage("Pivot Table");
             pgPivot.Controls.Add(pivotView);
             tabCodeEditors.TabPages.Add(pgPivot);
+            refreshHistory = new RefreshHistory();
+            pgRefreshHistory = new TabPage("Refresh History");
+            pgRefreshHistory.Controls.Add(refreshHistory);
+            tabCodeEditors.TabPages.Add(pgRefreshHistory);
             UI.ModelLoaded += (sender, args) => pivotView.ResetModel();
             ((ThemedTabControl)tabCodeEditors).UseEditorTabStyle();
             UI.ModelLoaded += (sender, args) => daxQueryTabs.ClearResults();
@@ -162,7 +166,7 @@ Selected.Hierarchies.ForEach(item => item.TranslatedDisplayFolders.SetAll(item.D
             daxQueryTabs.ApplyTheme();
             AppTheme.ApplyWorkspaceControl(pivotView);
             exploreDataTabs?.ApplyTheme();
-            if (refreshHistory != null) AppTheme.ApplyWorkspaceControl(refreshHistory);
+            AppTheme.ApplyWorkspaceControl(refreshHistory);
         }
 
         internal void PreviewTableData(Table table)
@@ -187,14 +191,19 @@ Selected.Hierarchies.ForEach(item => item.TranslatedDisplayFolders.SetAll(item.D
             _ = exploreDataTabs.OpenPreviewAsync(table);
         }
 
-        internal void RefreshModelData(TabularNamedObject target, RefreshType mode)
+        internal void RefreshModelData(TabularNamedObject target, RefreshType mode) =>
+            RefreshModelData(new[] { target }, mode, "Manual");
+
+        internal void RefreshModelData(TabularNamedObject[] targets, RefreshType mode, string origin)
         {
             var handler = UI.Handler;
-            if (handler?.IsConnected != true || target.IsRemoved) return;
+            if (handler?.IsConnected != true || targets.Length == 0 || targets.Any(target => target.IsRemoved)) return;
             var model = handler.Database.Name;
-            var targetName = target is Model ? "Entire model" : target.Name;
+            var targetNames = targets.Select(target => target is Model ? "Entire model"
+                : target is Partition partition ? $"Partition: {partition.Table.Name} / {partition.Name}"
+                : $"Table: {target.Name}").ToArray();
             if (mode == RefreshType.ClearValues &&
-                AppMessageBox.Show(this, $"Clear the data for {targetName} in “{model}” and its dependents?",
+                AppMessageBox.Show(this, $"Clear the data for {string.Join(", ", targetNames)} in “{model}” and its dependents?",
                     "Clear Values", MessageBoxButtons.YesNo, MessageBoxIcon.Warning,
                     MessageBoxDefaultButton.Button2) != DialogResult.Yes)
                 return;
@@ -204,7 +213,7 @@ Selected.Hierarchies.ForEach(item => item.TranslatedDisplayFolders.SetAll(item.D
             try
             {
                 connection = handler.GetQueryConnectionString(model);
-                command = TOMWrapper.Utils.Scripter.ScriptRefresh(new[] { target }, mode);
+                command = TOMWrapper.Utils.Scripter.ScriptRefresh(targets, mode);
             }
             catch (Exception error)
             {
@@ -212,29 +221,9 @@ Selected.Hierarchies.ForEach(item => item.TranslatedDisplayFolders.SetAll(item.D
                 return;
             }
 
-            _ = ShowRefreshHistory().RunAsync(model, targetName, mode, () => TOMWrapper.Database.ExecuteRefresh(connection, command));
-        }
-
-        private RefreshHistory ShowRefreshHistory()
-        {
-            if (pgRefreshHistory == null)
-            {
-                refreshHistory = new RefreshHistory();
-                pgRefreshHistory = new TabPage("Refresh History");
-                pgRefreshHistory.Controls.Add(refreshHistory);
-                refreshHistory.Emptied += (sender, args) =>
-                {
-                    var page = pgRefreshHistory;
-                    pgRefreshHistory = null;
-                    refreshHistory = null;
-                    RemoveWorkspacePage(page);
-                };
-                tabCodeEditors.TabPages.Add(pgRefreshHistory);
-                AppTheme.ApplyWorkspaceControl(refreshHistory);
-            }
-
             tabCodeEditors.SelectedTab = pgRefreshHistory;
-            return refreshHistory;
+            _ = refreshHistory.RunAsync(model, targetNames, mode, origin, command,
+                () => TOMWrapper.Database.ExecuteRefresh(connection, command));
         }
 
         private void RemoveWorkspacePage(TabPage page)
@@ -1219,7 +1208,6 @@ Selected.Hierarchies.ForEach(item => item.TranslatedDisplayFolders.SetAll(item.D
                 if (tabCodeEditors.SelectedTab == pgExpressionEditor) UI.CloseActiveExpressionTab();
                 else if (tabCodeEditors.SelectedTab == pgDaxScript) daxQueryTabs.CloseActiveTab();
                 else if (pgExploreData != null && tabCodeEditors.SelectedTab == pgExploreData) exploreDataTabs.CloseActiveTab();
-                else if (pgRefreshHistory != null && tabCodeEditors.SelectedTab == pgRefreshHistory) refreshHistory.CloseSelected();
                 else return base.ProcessCmdKey(ref msg, keyData);
                 return true;
             }

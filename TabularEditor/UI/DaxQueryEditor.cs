@@ -108,7 +108,7 @@ namespace TabularEditor.UI
             collapsedResultsCommands.Items.Add(ResultsArrow(true, "Show results", (sender, args) => ShowResultsPane()));
             split.Panel1.Controls.Add(collapsedResultsCommands);
 
-            grid = new ResultGrid
+            grid = new QueryResultGrid
             {
                 Dock = DockStyle.Fill, ReadOnly = true, VirtualMode = true,
                 AllowUserToAddRows = false, AllowUserToDeleteRows = false, AllowUserToResizeRows = false,
@@ -440,19 +440,6 @@ namespace TabularEditor.UI
             return button;
         }
 
-        private sealed class ResultGrid : DataGridView
-        {
-            protected override void OnPaint(PaintEventArgs e)
-            {
-                base.OnPaint(e);
-                if (!AppTheme.IsDark || !HorizontalScrollBar.Visible || !VerticalScrollBar.Visible) return;
-
-                // The space where the scroll bars meet is painted by the grid itself.
-                e.Graphics.FillRectangle(AppTheme.RaisedBrush, VerticalScrollBar.Left, HorizontalScrollBar.Top,
-                    VerticalScrollBar.Width, HorizontalScrollBar.Height);
-            }
-        }
-
         private void ShowTable(DataTable result)
         {
             HideTypeToolTip();
@@ -538,7 +525,7 @@ namespace TabularEditor.UI
             return ((IComparable)left).CompareTo(right);
         }
 
-        private static string DisplayFormat(string format)
+        internal static string DisplayFormat(string format)
         {
             switch (format.ToUpperInvariant())
             {
@@ -558,7 +545,7 @@ namespace TabularEditor.UI
         private static readonly Regex DateFormatTokens = new Regex(
             @"'[^']*'|""[^""]*""|\\.|AM/PM|AMPM|([a-zA-Z])\1*|.", RegexOptions.CultureInvariant);
 
-        private static string NormalizeModelDateFormat(string format)
+        internal static string NormalizeModelDateFormat(string format)
         {
             if (format.Length <= 1) return format;
             var time = false;
@@ -1086,7 +1073,7 @@ namespace TabularEditor.UI
                 type == typeof(double) || type == typeof(decimal);
         }
 
-        private sealed class FilterDateField : Panel
+        internal sealed class FilterDateField : Panel
         {
             private readonly CultureInfo culture;
             private readonly string pattern;

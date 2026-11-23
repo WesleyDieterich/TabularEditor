@@ -304,6 +304,7 @@
     <Compile Include="UI\FilterCalendar.cs" />
     <Compile Include="UI\DaxQueryTabs.cs" />
     <Compile Include="UI\PivotView.cs" />
+    <Compile Include="UI\PivotFilterDialog.cs" />
     <Compile Include="UI\RefreshHistory.cs" />
     <Compile Include="UI\DaxQueryWorkbook.cs" />
     <Compile Include="UI\AppTheme.cs" />

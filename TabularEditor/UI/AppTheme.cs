@@ -349,16 +349,49 @@ namespace TabularEditor.UI
                     Set(selector.FlatStyle, value => selector.FlatStyle = value, FlatStyle.Standard);
                     selector.HandleCreated += StyleSelector;
                     if (selector.IsHandleCreated) StyleSelector(selector, EventArgs.Empty);
-                    var chrome = new DarkSelectorChrome(selector);
+                    IntPtr themedList = IntPtr.Zero;
+                    EventHandler styleList = (sender, args) =>
+                    {
+                        var info = new DarkSelectorChrome.ComboBoxInfo { Size = Marshal.SizeOf<DarkSelectorChrome.ComboBoxInfo>() };
+                        if (!DarkSelectorChrome.GetComboBoxInfo(selector.Handle, ref info) ||
+                            info.ListHandle == IntPtr.Zero || info.ListHandle == themedList) return;
+                        SetWindowTheme(info.ListHandle, "DarkMode_Explorer", null);
+                        themedList = info.ListHandle;
+                    };
+                    EventHandler resetList = (sender, args) => themedList = IntPtr.Zero;
+                    selector.HandleCreated += styleList;
+                    selector.HandleDestroyed += resetList;
+                    selector.DropDown += styleList;
+                    if (selector.IsHandleCreated) styleList(selector, EventArgs.Empty);
+                    // Editable selectors already use the native dark theme. Painting over its hover animation flashes the border.
+                    var chrome = selector.DropDownStyle == ComboBoxStyle.DropDownList ? new DarkSelectorChrome(selector) : null;
                     restore.Add(() =>
                     {
-                        chrome.Dispose();
+                        chrome?.Dispose();
                         selector.HandleCreated -= StyleSelector;
+                        selector.HandleCreated -= styleList;
+                        selector.HandleDestroyed -= resetList;
+                        selector.DropDown -= styleList;
+                        if (themedList != IntPtr.Zero) SetWindowTheme(themedList, null, null);
                         if (selector.IsHandleCreated) SetWindowTheme(selector.Handle, null, null);
                     });
                 }
-                else if (control is TextBoxBase input && input.BorderStyle == BorderStyle.Fixed3D)
-                    Set(input.BorderStyle, value => input.BorderStyle = value, BorderStyle.FixedSingle);
+                else if (control is TextBoxBase input)
+                {
+                    if (input.BorderStyle == BorderStyle.Fixed3D)
+                        Set(input.BorderStyle, value => input.BorderStyle = value, BorderStyle.FixedSingle);
+                    if (input is TextBox text && text.Multiline && text.ScrollBars != ScrollBars.None)
+                    {
+                        EventHandler applyScrollTheme = (sender, args) => SetWindowTheme(text.Handle, "DarkMode_Explorer", null);
+                        text.HandleCreated += applyScrollTheme;
+                        if (text.IsHandleCreated) applyScrollTheme(text, EventArgs.Empty);
+                        restore.Add(() =>
+                        {
+                            text.HandleCreated -= applyScrollTheme;
+                            if (text.IsHandleCreated) SetWindowTheme(text.Handle, null, null);
+                        });
+                    }
+                }
                 else if (control is ScrollBar scrollBar)
                 {
                     var chrome = new DarkScrollBar(scrollBar);

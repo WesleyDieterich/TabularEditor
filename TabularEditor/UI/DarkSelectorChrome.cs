@@ -122,7 +122,7 @@ namespace TabularEditor.UI
         }
 
         [StructLayout(LayoutKind.Sequential)]
-        private struct ComboBoxInfo
+        internal struct ComboBoxInfo
         {
             internal int Size, ItemLeft, ItemTop, ItemRight, ItemBottom;
             internal int ButtonLeft, ButtonTop, ButtonRight, ButtonBottom, ButtonState;
@@ -130,7 +130,7 @@ namespace TabularEditor.UI
         }
 
         [DllImport("user32.dll")]
-        private static extern bool GetComboBoxInfo(IntPtr hwnd, ref ComboBoxInfo info);
+        internal static extern bool GetComboBoxInfo(IntPtr hwnd, ref ComboBoxInfo info);
 
         [DllImport("user32.dll")]
         private static extern IntPtr GetWindowDC(IntPtr hwnd);
