@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.Linq;
 using System.IO;
@@ -6,6 +6,7 @@ using System.Windows.Forms;
 using TabularEditor.UI;
 using TabularEditor.UI.Extensions;
 using TabularEditor.UI.Actions;
+using TabularEditor.UI.ModelDiagram;
 using TabularEditor.UI.Dialogs;
 using TabularEditor.UIServices;
 using System.Collections.Generic;
@@ -26,6 +27,8 @@ namespace TabularEditor
         private TabPage pgDaxScript;
         private readonly PivotView pivotView;
         private readonly TabPage pgPivot;
+        private readonly DiagramView modelDiagram;
+        private readonly TabPage pgModelDiagram;
         private DaxQueryTabs exploreDataTabs;
         private TabPage pgExploreData;
         private RefreshHistory refreshHistory;
@@ -57,7 +60,12 @@ namespace TabularEditor
             pgPivot = new TabPage("Pivot Table");
             pgPivot.Controls.Add(pivotView);
             tabCodeEditors.TabPages.Add(pgPivot);
+            modelDiagram = new DiagramView(() => UI.Handler);
+            pgModelDiagram = new TabPage("Model Diagram");
+            pgModelDiagram.Controls.Add(modelDiagram);
+            tabCodeEditors.TabPages.Add(pgModelDiagram);
             UI.ModelLoaded += (sender, args) => pivotView.ResetModel();
+            UI.ModelLoaded += (sender, args) => modelDiagram.ResetModel();
             ((ThemedTabControl)tabCodeEditors).UseEditorTabStyle();
             UI.ModelLoaded += (sender, args) => daxQueryTabs.ClearResults();
             UI.ModelLoaded += (sender, args) => exploreDataTabs?.ClearResults();
@@ -161,6 +169,7 @@ Selected.Hierarchies.ForEach(item => item.TranslatedDisplayFolders.SetAll(item.D
             UI.ApplyEditorTheme();
             daxQueryTabs.ApplyTheme();
             AppTheme.ApplyWorkspaceControl(pivotView);
+            modelDiagram.ApplyTheme();
             exploreDataTabs?.ApplyTheme();
             if (refreshHistory != null) AppTheme.ApplyWorkspaceControl(refreshHistory);
         }
@@ -180,7 +189,7 @@ Selected.Hierarchies.ForEach(item => item.TranslatedDisplayFolders.SetAll(item.D
                     exploreDataTabs = null;
                     RemoveWorkspacePage(page);
                 };
-                tabCodeEditors.TabPages.Insert(tabCodeEditors.TabPages.IndexOf(pgPivot) + 1, pgExploreData);
+                tabCodeEditors.TabPages.Insert(tabCodeEditors.TabPages.IndexOf(pgModelDiagram) + 1, pgExploreData);
                 exploreDataTabs.ApplyTheme();
             }
             tabCodeEditors.SelectedTab = pgExploreData;

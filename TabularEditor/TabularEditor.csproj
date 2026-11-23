@@ -303,6 +303,15 @@
     <Compile Include="UI\DaxQueryEditor.cs" />
     <Compile Include="UI\FilterCalendar.cs" />
     <Compile Include="UI\DaxQueryTabs.cs" />
+    <Compile Include="UI\ModelDiagram\AutoLayout.cs" />
+    <Compile Include="UI\ModelDiagram\DiagramCanvas.cs">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Include="UI\ModelDiagram\DiagramGraph.cs" />
+    <Compile Include="UI\ModelDiagram\DiagramLayoutStore.cs" />
+    <Compile Include="UI\ModelDiagram\DiagramView.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
     <Compile Include="UI\PivotView.cs" />
     <Compile Include="UI\RefreshHistory.cs" />
     <Compile Include="UI\DaxQueryWorkbook.cs" />

@@ -18,7 +18,18 @@ namespace TabularEditor.UI
     {
         TabularNodeTextBox TreeView_NameCol;
 
-        public void Goto(ITabularNamedObject obj)
+        /// <summary>
+        /// Raised after the selection in the model tree changes, for views that mirror it.
+        /// </summary>
+        public event EventHandler SelectionChanged;
+
+        public void Goto(ITabularNamedObject obj) => Goto(obj, focusTree: true);
+
+        /// <summary>
+        /// Selects the object in the model tree. With focusTree false, keyboard focus stays where
+        /// it is, so a view such as the model diagram can drive the selection.
+        /// </summary>
+        public void Goto(ITabularNamedObject obj, bool focusTree)
         {
             var node = UI.TreeView.FindNodeByTag(obj);
             if(node == null)
@@ -47,8 +58,11 @@ namespace TabularEditor.UI
             {
                 UI.TreeView.EnsureVisible(node);
                 UI.TreeView.SelectedNode = node;
-                UI.FormMain.Activate();
-                UI.TreeView.Focus();
+                if (focusTree)
+                {
+                    UI.FormMain.Activate();
+                    UI.TreeView.Focus();
+                }
             }
         }
 
@@ -329,6 +343,7 @@ namespace TabularEditor.UI
             }
 
             DynamicMenu_Update();
+            SelectionChanged?.Invoke(this, EventArgs.Empty);
         }
 
         bool ShowSelectionStatus = false;
