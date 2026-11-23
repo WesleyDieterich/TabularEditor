@@ -312,6 +312,10 @@
     <Compile Include="UI\ModelDiagram\DiagramView.cs">
       <SubType>UserControl</SubType>
     </Compile>
+    <Compile Include="UI\ModelDiagram\RelationshipDialog.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="UI\ModelDiagram\RelationshipEdits.cs" />
     <Compile Include="UI\ModelDiagram\LayoutNameDialog.cs">
       <SubType>Form</SubType>
     </Compile>

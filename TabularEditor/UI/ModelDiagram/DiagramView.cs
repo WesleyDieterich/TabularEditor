@@ -54,6 +54,8 @@ namespace TabularEditor.UI.ModelDiagram
             toolbar.Items.Add(new ToolStripSeparator());
             toolbar.Items.Add(Button("Arrange all", "Place every table in this layout automatically, replacing the positions you set", ArrangeAll));
             toolbar.Items.Add(new ToolStripSeparator());
+            toolbar.Items.Add(Button("New relationship", "Create a relationship. You can also drag a column onto a column of another table.", () => NewRelationship()));
+            toolbar.Items.Add(new ToolStripSeparator());
             toolbar.Items.Add(search);
             toolbar.Items.Add(status);
             search.Control.SetCueBanner("Find table");
@@ -67,7 +69,10 @@ namespace TabularEditor.UI.ModelDiagram
             canvas.LayoutChanged += (s, e) => ScheduleSave();
             canvas.ViewChanged += (s, e) => { UpdateZoomLabel(); ScheduleSave(); };
             canvas.HoverChanged += (s, obj) => status.Text = obj is SingleColumnRelationship r ? Describe(r) : StatusText();
-            canvas.ContextMenuRequested += (s, e) => ShowContextMenu(e.Node, e.Location);
+            canvas.ContextMenuRequested += (s, e) => ShowContextMenu(e.Node, e.Edge, e.Location);
+            canvas.RelationshipDragged += (s, e) => NewRelationship(RelationshipEdits.Suggest(e.Source, e.Target));
+            canvas.EditRequested += (s, r) => EditRelationship(r);
+            canvas.DeleteRequested += (s, list) => DeleteRelationships(list);
             canvas.DragEnter += Canvas_DragOver;
             canvas.DragOver += Canvas_DragOver;
             canvas.DragDrop += Canvas_DragDrop;
@@ -284,11 +289,109 @@ namespace TabularEditor.UI.ModelDiagram
 
         #endregion
 
+        #region Editing relationships
+
+        private bool CanCreate => handler?.Model != null && handler.PowerBIGovernance.AllowCreate(typeof(SingleColumnRelationship));
+        private bool CanDelete => handler?.Model != null && handler.PowerBIGovernance.AllowDelete(typeof(SingleColumnRelationship));
+
+        /// <summary>
+        /// Opens the relationship dialog for a new relationship. Without settings, the two tables
+        /// selected in the diagram (if exactly two) are filled in.
+        /// </summary>
+        private void NewRelationship(RelationshipSpec spec = null)
+        {
+            if (!CanCreate)
+            {
+                AppMessageBox.Show(FindForm(), "Relationships cannot be created in this model.", "New relationship", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+            if (spec == null)
+            {
+                spec = new RelationshipSpec();
+                var tables = canvas.SelectedNodes.Select(n => n.Table).ToList();
+                if (tables.Count == 2)
+                {
+                    spec.Column1 = tables[0].Columns.FirstOrDefault(c => c.IsKey) ?? tables[0].Columns.FirstOrDefault();
+                    spec.Column2 = tables[1].Columns.FirstOrDefault(c => c.IsKey) ?? tables[1].Columns.FirstOrDefault();
+                }
+            }
+            var result = RelationshipDialog.Show(FindForm(), handler, spec);
+            if (result == null) return;
+            var created = RelationshipEdits.Create(result);
+            Rebuild();
+            Canvas_ObjectClicked(canvas, created);
+        }
+
+        private void EditRelationship(SingleColumnRelationship relationship)
+        {
+            if (relationship.IsRemoved) return;
+            var result = RelationshipDialog.Show(FindForm(), handler, RelationshipSpec.From(relationship), relationship);
+            if (result == null) return;
+            RelationshipEdits.Update(relationship, result);
+            Rebuild();
+            Canvas_ObjectClicked(canvas, relationship);
+        }
+
+        private void ToggleActive(SingleColumnRelationship relationship)
+        {
+            if (!relationship.IsActive && RelationshipEdits.ConflictsWithActiveRelationship(relationship.FromColumn.Table, relationship.ToColumn.Table, relationship))
+            {
+                AppMessageBox.Show(FindForm(), "Another active relationship already joins these tables. Make that one inactive first.",
+                    "Make active", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+            var spec = RelationshipSpec.From(relationship);
+            spec.IsActive = !relationship.IsActive;
+            RelationshipEdits.Update(relationship, spec);
+            Rebuild();
+        }
+
+        /// <summary>Deletes after confirmation, as one undo step.</summary>
+        private void DeleteRelationships(IReadOnlyList<SingleColumnRelationship> relationships)
+        {
+            relationships = relationships.Where(r => !r.IsRemoved).ToList();
+            if (relationships.Count == 0) return;
+            if (!CanDelete)
+            {
+                AppMessageBox.Show(FindForm(), "Relationships cannot be deleted in this model.", "Delete relationship", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+            var text = relationships.Count == 1
+                ? $"Delete the relationship {relationships[0].Name}?"
+                : $"Delete {relationships.Count} relationships?";
+            if (AppMessageBox.Show(FindForm(), text + "\n\nYou can undo this with Ctrl+Z.", "Delete relationship",
+                    MessageBoxButtons.OKCancel, MessageBoxIcon.Question) != DialogResult.OK) return;
+
+            handler.BeginUpdate(relationships.Count == 1 ? "delete relationship" : "delete relationships");
+            try
+            {
+                foreach (var r in relationships) r.Delete();
+            }
+            finally
+            {
+                handler.EndUpdate();
+            }
+            Rebuild();
+        }
+
+        #endregion
+
         #region Context menu
 
-        private void ShowContextMenu(DiagramNode node, Point location)
+        private void ShowContextMenu(DiagramNode node, DiagramEdge edge, Point location)
         {
             menu.Items.Clear();
+            if (edge != null)
+            {
+                var r = edge.Relationship;
+                menu.Items.Add("Edit relationship...", null, (s, e) => EditRelationship(r));
+                menu.Items.Add(r.IsActive ? "Make inactive" : "Make active", null, (s, e) => ToggleActive(r));
+                menu.Items.Add(new ToolStripSeparator());
+                menu.Items.Add("Delete relationship", null, (s, e) => DeleteRelationships(new[] { r })).Enabled = CanDelete;
+                AppTheme.ApplyContextMenu(menu);
+                menu.Show(canvas, location);
+                return;
+            }
             var targets = node == null ? new List<DiagramNode>() : canvas.SelectedNodes.ToList();
             if (node != null && !targets.Contains(node)) targets = new List<DiagramNode> { node };
 
@@ -316,6 +419,7 @@ namespace TabularEditor.UI.ModelDiagram
                 menu.Items.Add("Fit to window", null, (s, e) => canvas.FitToWindow());
                 menu.Items.Add("Arrange all", null, (s, e) => ArrangeAll());
                 menu.Items.Add("Select all", null, (s, e) => canvas.SelectNodes(canvas.Graph.Nodes));
+                menu.Items.Add("New relationship...", null, (s, e) => NewRelationship()).Enabled = CanCreate;
                 menu.Items.Add(new ToolStripSeparator());
                 menu.Items.Add("New layout", null, (s, e) => NewLayout());
             }
@@ -421,6 +525,7 @@ namespace TabularEditor.UI.ModelDiagram
                 graph.BringToFront(node);
 
             AutoLayout.Arrange(graph, unplaced);
+            canvas.AllowRelationshipEditing = CanCreate;
             canvas.EmptyText = model == null ? NoModelText : layout.IsAllTables ? "This model has no tables." : EmptyLayoutText;
             canvas.Graph = graph;
             canvas.SetSelection(CurrentTreeSelection(), selectTables: false);

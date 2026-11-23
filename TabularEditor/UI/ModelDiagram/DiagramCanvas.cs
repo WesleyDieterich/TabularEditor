@@ -35,7 +35,7 @@ namespace TabularEditor.UI.ModelDiagram
         private float zoom = 1f;
         private PointF scroll;
 
-        private enum DragMode { None, Pending, Pan, MoveNodes, Resize, Marquee }
+        private enum DragMode { None, Pending, Pan, MoveNodes, Resize, Marquee, Link }
         private DragMode drag;
         private Point dragStart;
         private PointF dragStartScroll;
@@ -47,6 +47,9 @@ namespace TabularEditor.UI.ModelDiagram
         private bool marqueeAdds;
         private Hit pressed;
         private Hit hover;
+        /// <summary>While dragging a column onto another: the cursor in world units, and the column under it.</summary>
+        private PointF linkEnd;
+        private DiagramField linkTarget;
 
         public DiagramCanvas()
         {
@@ -65,8 +68,17 @@ namespace TabularEditor.UI.ModelDiagram
         public event EventHandler ViewChanged;
         /// <summary>The relationship or table under the mouse changed (null when over nothing).</summary>
         public event EventHandler<ITabularNamedObject> HoverChanged;
-        /// <summary>Right-click: the node under the mouse (null on empty space) and the screen position.</summary>
-        public event EventHandler<(DiagramNode Node, Point Location)> ContextMenuRequested;
+        /// <summary>Right-click: the node or relationship under the mouse (both null on empty space) and the screen position.</summary>
+        public event EventHandler<(DiagramNode Node, DiagramEdge Edge, Point Location)> ContextMenuRequested;
+        /// <summary>A column was dragged onto a column of another table.</summary>
+        public event EventHandler<(Column Source, Column Target)> RelationshipDragged;
+        /// <summary>A relationship line was double-clicked.</summary>
+        public event EventHandler<SingleColumnRelationship> EditRequested;
+        /// <summary>Delete was pressed with relationships selected.</summary>
+        public event EventHandler<IReadOnlyList<SingleColumnRelationship>> DeleteRequested;
+
+        /// <summary>When false, dragging a column moves its table instead of starting a relationship.</summary>
+        public bool AllowRelationshipEditing { get; set; } = true;
 
         public DiagramGraph Graph
         {
@@ -328,6 +340,11 @@ namespace TabularEditor.UI.ModelDiagram
             {
                 // Right-clicking a table outside the selection selects just that table, as in Explorer.
                 if (dragNode != null && !selectedNodes.Contains(dragNode)) SelectNodes(new[] { dragNode });
+                if (pressed?.Kind == HitKind.Edge && !selection.Contains(pressed.Edge.Relationship))
+                {
+                    SelectNodes(Enumerable.Empty<DiagramNode>());
+                    ObjectClicked?.Invoke(this, pressed.Edge.Relationship);
+                }
                 return;
             }
             if (e.Button != MouseButtons.Left) return;
@@ -356,7 +373,14 @@ namespace TabularEditor.UI.ModelDiagram
             if (drag == DragMode.Pending)
             {
                 if (Math.Abs(e.X - dragStart.X) < DragThreshold && Math.Abs(e.Y - dragStart.Y) < DragThreshold) return;
-                if (dragNode != null)
+                if (pressed?.Kind == HitKind.Field && pressed.Field.Object is Column && AllowRelationshipEditing)
+                {
+                    // Dragging a column starts a relationship, as in Power BI. Drag the header to move the table.
+                    drag = DragMode.Link;
+                    linkTarget = null;
+                    Cursor = Cursors.Cross;
+                }
+                else if (dragNode != null)
                 {
                     // Dragging a table outside the selection moves just that table.
                     if (!selectedNodes.Contains(dragNode)) selectedNodes = new HashSet<DiagramNode> { dragNode };
@@ -365,7 +389,7 @@ namespace TabularEditor.UI.ModelDiagram
                     drag = DragMode.MoveNodes;
                 }
                 else drag = DragMode.Pan;
-                Cursor = Cursors.SizeAll;
+                if (drag != DragMode.Link) Cursor = Cursors.SizeAll;
             }
 
             switch (drag)
@@ -392,6 +416,15 @@ namespace TabularEditor.UI.ModelDiagram
                     dragNode.Size = new SizeF(width, height);
                     dragNode.HasCustomSize = true;
                     if (!dragNode.Collapsed) dragNode.CustomHeight = height;
+                    Invalidate();
+                    return;
+
+                case DragMode.Link:
+                    linkEnd = world;
+                    var over = HitTest(e.Location);
+                    linkTarget = over?.Kind == HitKind.Field && over.Field.Object is Column target &&
+                        target.Table != ((Column)pressed.Field.Object).Table ? over.Field : null;
+                    Cursor = linkTarget != null ? Cursors.Cross : Cursors.No;
                     Invalidate();
                     return;
 
@@ -428,7 +461,14 @@ namespace TabularEditor.UI.ModelDiagram
 
             if (e.Button == MouseButtons.Right && mode == DragMode.None)
             {
-                ContextMenuRequested?.Invoke(this, (dragNode, e.Location));
+                ContextMenuRequested?.Invoke(this, (dragNode, pressed?.Kind == HitKind.Edge ? pressed.Edge : null, e.Location));
+            }
+            else if (mode == DragMode.Link)
+            {
+                var source = (Column)pressed.Field.Object;
+                var target = linkTarget?.Object as Column;
+                linkTarget = null;
+                if (target != null) RelationshipDragged?.Invoke(this, (source, target));
             }
             else if (mode == DragMode.Pending && e.Button == MouseButtons.Left)
             {
@@ -511,6 +551,11 @@ namespace TabularEditor.UI.ModelDiagram
         {
             base.OnMouseDoubleClick(e);
             var hit = HitTest(e.Location);
+            if (hit?.Kind == HitKind.Edge)
+            {
+                EditRequested?.Invoke(this, hit.Edge.Relationship);
+                return;
+            }
             // Double-clicking "+ N more" grows the card to show every field.
             if (hit?.Kind == HitKind.More)
             {
@@ -570,6 +615,11 @@ namespace TabularEditor.UI.ModelDiagram
                 case Keys.D0: case Keys.NumPad0: if (e.Control) FitToWindow(); else return; break;
                 case Keys.A: if (e.Control) SelectNodes(graph.Nodes); else return; break;
                 case Keys.Escape: SelectNodes(Enumerable.Empty<DiagramNode>()); break;
+                case Keys.Delete:
+                    var relationships = graph.Edges.Select(x => x.Relationship).Where(selection.Contains).ToList();
+                    if (relationships.Count == 0) return;
+                    DeleteRequested?.Invoke(this, relationships);
+                    break;
                 default: return;
             }
             e.Handled = true;
@@ -649,6 +699,8 @@ namespace TabularEditor.UI.ModelDiagram
                     DrawNode(g, node, palette, header, italic, detailed);
                 }
             }
+
+            if (drag == DragMode.Link && pressed?.Node != null) DrawLink(g, palette);
 
             if (drag == DragMode.Marquee && !marquee.IsEmpty)
             {
@@ -804,6 +856,26 @@ namespace TabularEditor.UI.ModelDiagram
             using (var path = RoundedRect(bounds, 6))
             using (var pen = new Pen(border, borderWidth))
                 g.DrawPath(pen, path);
+        }
+
+        /// <summary>The rubber-band line from the dragged column to the cursor or the target column.</summary>
+        private void DrawLink(Graphics g, Palette palette)
+        {
+            var node = pressed.Node;
+            var row = node.DisplayFields.ToList().IndexOf(pressed.Field);
+            var start = new PointF(node.Location.X + node.Size.Width / 2, node.Location.Y + CardMetrics.HeaderHeight + (row + 0.5f) * CardMetrics.RowHeight);
+            var end = linkEnd;
+            if (linkTarget != null)
+            {
+                var targetNode = graph.Nodes.First(n => n.DisplayFields.Contains(linkTarget));
+                var targetRow = targetNode.DisplayFields.ToList().IndexOf(linkTarget);
+                var targetRect = new RectangleF(targetNode.Location.X, targetNode.Location.Y + CardMetrics.HeaderHeight + targetRow * CardMetrics.RowHeight, targetNode.Size.Width, CardMetrics.RowHeight);
+                using (var fill = new SolidBrush(palette.SelectionFill)) g.FillRectangle(fill, targetRect);
+                using (var pen = new Pen(palette.Accent, 1.5f / zoom)) g.DrawRectangle(pen, targetRect.X, targetRect.Y, targetRect.Width, targetRect.Height);
+                end = new PointF(targetRect.X + targetRect.Width / 2, targetRect.Y + targetRect.Height / 2);
+            }
+            using (var pen = new Pen(palette.Accent, 2f / zoom) { DashPattern = new[] { 4f, 3f } })
+                g.DrawLine(pen, start, end);
         }
 
         private static void DrawChevron(Graphics g, PointF c, bool collapsed, Color color)

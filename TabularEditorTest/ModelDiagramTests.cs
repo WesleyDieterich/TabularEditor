@@ -270,6 +270,107 @@ namespace TabularEditor
             Assert.AreEqual(3, rows, "Four rows fit: three fields and the \"+ N more\" row.");
         }
 
+        private static Column Col(Model model, string table, string column) => model.Tables[table].Columns[column];
+
+        [TestMethod]
+        public void InvalidRelationshipsAreRejected()
+        {
+            var model = new TabularModelHandler("AdventureWorks.bim").Model;
+
+            Assert.IsNotNull(RelationshipEdits.Validate(new RelationshipSpec { Column1 = Col(model, "Customer", "CustomerKey") }), "Both columns are required.");
+            Assert.IsNotNull(RelationshipEdits.Validate(new RelationshipSpec
+            { Column1 = Col(model, "Customer", "CustomerKey"), Column2 = Col(model, "Customer", "GeographyKey") }), "Same table.");
+            Assert.IsNotNull(RelationshipEdits.Validate(new RelationshipSpec
+            { Column1 = Col(model, "Customer", "CustomerKey"), Column2 = Col(model, "Product", "Color") }), "Different data types.");
+
+            var existing = model.Relationships.OfType<SingleColumnRelationship>().First();
+            var duplicate = new RelationshipSpec { Column1 = existing.ToColumn, Column2 = existing.FromColumn };
+            Assert.IsNotNull(RelationshipEdits.Validate(duplicate), "The same pair of columns, either way round, is a duplicate.");
+            Assert.IsNull(RelationshipEdits.Validate(RelationshipSpec.From(existing), existing), "Editing a relationship is not a duplicate of itself.");
+
+            var security = RelationshipSpec.From(existing);
+            security.SecurityFiltering = SecurityFilteringBehavior.BothDirections;
+            security.CrossFiltering = CrossFilteringBehavior.OneDirection;
+            Assert.IsNotNull(RelationshipEdits.Validate(security, existing), "Security filtering both ways needs cross filtering both ways.");
+        }
+
+        [TestMethod]
+        public void OneToManyIsStoredWithTheManySideAsFrom()
+        {
+            var model = new TabularModelHandler("AdventureWorks.bim").Model;
+            var spec = new RelationshipSpec
+            {
+                Column1 = Col(model, "Customer", "CustomerKey"),
+                Column2 = Col(model, "Internet Sales", "CustomerKey"),
+                Cardinality = RelationshipCardinality.OneToMany,
+            };
+
+            Assert.AreSame(spec.Column2, spec.FromColumn);
+            Assert.AreSame(spec.Column1, spec.ToColumn);
+            Assert.AreEqual(RelationshipEndCardinality.Many, spec.FromCardinality);
+            Assert.AreEqual(RelationshipEndCardinality.One, spec.ToCardinality);
+
+            spec.Cardinality = RelationshipCardinality.ManyToMany;
+            Assert.AreEqual(RelationshipEndCardinality.Many, spec.ToCardinality);
+            spec.Cardinality = RelationshipCardinality.OneToOne;
+            Assert.AreEqual(RelationshipEndCardinality.One, spec.FromCardinality);
+        }
+
+        [TestMethod]
+        public void NewRelationshipBetweenAlreadyRelatedTablesStartsInactive()
+        {
+            var model = new TabularModelHandler("AdventureWorks.bim").Model;
+            var active = model.Relationships.OfType<SingleColumnRelationship>().First(r => r.IsActive);
+            var a = active.FromColumn.Table;
+            var b = active.ToColumn.Table;
+
+            Assert.IsTrue(RelationshipEdits.ConflictsWithActiveRelationship(a, b));
+            Assert.IsTrue(RelationshipEdits.ConflictsWithActiveRelationship(b, a));
+            Assert.IsFalse(RelationshipEdits.ConflictsWithActiveRelationship(a, b, active), "The relationship being edited does not conflict with itself.");
+
+            var other = a.Columns.First(c => c != active.FromColumn && b.Columns.Any(d => d.DataType == c.DataType));
+            var target = b.Columns.First(d => d.DataType == other.DataType && d != active.ToColumn);
+            Assert.IsFalse(RelationshipEdits.Suggest(other, target).IsActive);
+        }
+
+        [TestMethod]
+        public void CreatingAndEditingAreSingleUndoSteps()
+        {
+            var handler = new TabularModelHandler("AdventureWorks.bim");
+            var model = handler.Model;
+            var before = model.Relationships.Count;
+            var spec = new RelationshipSpec
+            {
+                Column1 = Col(model, "Customer", "CustomerKey"),
+                Column2 = Col(model, "Product", "ProductKey"),
+                Cardinality = RelationshipCardinality.ManyToMany,
+                CrossFiltering = CrossFilteringBehavior.BothDirections,
+                IsActive = false,
+            };
+            Assert.IsNull(RelationshipEdits.Validate(spec), RelationshipEdits.Validate(spec));
+
+            var created = RelationshipEdits.Create(spec);
+            Assert.AreEqual(before + 1, model.Relationships.Count);
+            Assert.AreSame(spec.Column1, created.FromColumn);
+            Assert.AreEqual(RelationshipEndCardinality.Many, created.ToCardinality);
+            Assert.AreEqual(CrossFilteringBehavior.BothDirections, created.CrossFilteringBehavior);
+            Assert.IsFalse(created.IsActive);
+
+            var edit = RelationshipSpec.From(created);
+            edit.Cardinality = RelationshipCardinality.ManyToOne;
+            edit.CrossFiltering = CrossFilteringBehavior.OneDirection;
+            RelationshipEdits.Update(created, edit);
+            Assert.AreEqual(RelationshipEndCardinality.One, created.ToCardinality);
+            Assert.AreEqual(CrossFilteringBehavior.OneDirection, created.CrossFilteringBehavior);
+
+            handler.UndoManager.Undo();
+            Assert.AreEqual(RelationshipEndCardinality.Many, created.ToCardinality, "One undo reverts the whole edit.");
+            Assert.AreEqual(CrossFilteringBehavior.BothDirections, created.CrossFilteringBehavior);
+
+            handler.UndoManager.Undo();
+            Assert.AreEqual(before, model.Relationships.Count, "One undo removes the created relationship.");
+        }
+
         [TestMethod]
         public void SavedNodeIsFoundByLineageTagThenName()
         {
