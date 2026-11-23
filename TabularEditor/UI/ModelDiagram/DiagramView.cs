@@ -342,6 +342,12 @@ namespace TabularEditor.UI.ModelDiagram
             }
             var spec = RelationshipSpec.From(relationship);
             spec.IsActive = !relationship.IsActive;
+            var ambiguity = spec.IsActive ? RelationshipEdits.FindNewAmbiguity(spec, relationship) : null;
+            if (ambiguity != null)
+            {
+                AppMessageBox.Show(FindForm(), ambiguity, "Make active", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
             RelationshipEdits.Update(relationship, spec);
             Rebuild();
         }

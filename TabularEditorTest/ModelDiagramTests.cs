@@ -372,6 +372,95 @@ namespace TabularEditor
         }
 
         [TestMethod]
+        public void DeployableModelHasNoAmbiguousPaths()
+        {
+            // AdventureWorks deploys to Analysis Services, which rejects ambiguous filter paths.
+            // Several fact tables sharing Date, Product, etc. form loops, but not ambiguity.
+            var model = new TabularModelHandler("AdventureWorks.bim").Model;
+            var found = RelationshipEdits.FindAmbiguities(model);
+            Assert.AreEqual(0, found.Count, found.FirstOrDefault()?.Describe());
+        }
+
+        [TestMethod]
+        public void ActivatingAnyInactiveRelationshipIsRejected()
+        {
+            // Every inactive relationship in AdventureWorks is inactive because activating it
+            // would give some table two filter paths to another.
+            var model = new TabularModelHandler("AdventureWorks.bim").Model;
+            var inactive = model.Relationships.OfType<SingleColumnRelationship>().Where(r => !r.IsActive).ToList();
+            Assert.IsTrue(inactive.Count > 0);
+            foreach (var r in inactive)
+            {
+                var spec = RelationshipSpec.From(r);
+                spec.IsActive = true;
+                Assert.IsNotNull(RelationshipEdits.FindNewAmbiguity(spec, r), r.Name);
+            }
+        }
+
+        [TestMethod]
+        public void BothDirectionsOnASharedDimensionIsAmbiguous()
+        {
+            // Date filters Reseller Sales directly. Filtering Product from Internet Sales would add
+            // a second route: Date → Internet Sales → Product → Reseller Sales.
+            var model = new TabularModelHandler("AdventureWorks.bim").Model;
+            var toProduct = model.Relationships.OfType<SingleColumnRelationship>()
+                .Single(r => r.IsActive && r.FromColumn.Table.Name == "Internet Sales" && r.ToColumn.Table.Name == "Product");
+
+            var spec = RelationshipSpec.From(toProduct);
+            spec.CrossFiltering = CrossFilteringBehavior.BothDirections;
+            var message = RelationshipEdits.FindNewAmbiguity(spec, toProduct);
+
+            Assert.IsNotNull(message);
+            StringAssert.Contains(message, "Reseller Sales");
+            spec.IsActive = false;
+            Assert.IsNull(RelationshipEdits.FindNewAmbiguity(spec, toProduct), "Inactive relationships carry no filters.");
+        }
+
+        [TestMethod]
+        public void UnchangedRelationshipIsNotReportedAsAmbiguous()
+        {
+            var model = new TabularModelHandler("AdventureWorks.bim").Model;
+            foreach (var r in model.Relationships.OfType<SingleColumnRelationship>())
+                Assert.IsNull(RelationshipEdits.FindNewAmbiguity(RelationshipSpec.From(r), r), r.Name);
+        }
+
+        [TestMethod]
+        public void DraggedRelationshipStartsInactiveWhenActiveWouldBeAmbiguous()
+        {
+            // Employee and Sales Territory have no active relationship between them, so the direct
+            // check allows an active one; only the path check sees that Sales Territory already
+            // reaches Reseller Sales directly, and would reach it again through Employee.
+            var model = new TabularModelHandler("AdventureWorks.bim").Model;
+            var employee = Col(model, "Employee", "SalesTerritoryKey");
+            var territory = Col(model, "Sales Territory", "SalesTerritoryKey");
+            Assert.IsFalse(RelationshipEdits.ConflictsWithActiveRelationship(employee.Table, territory.Table));
+
+            var spec = RelationshipEdits.Suggest(employee, territory);
+
+            Assert.IsFalse(spec.IsActive);
+            spec.IsActive = true;
+            StringAssert.Contains(RelationshipEdits.FindNewAmbiguity(spec), "Reseller Sales");
+        }
+
+        [TestMethod]
+        public void AmbiguitySearchIsBounded()
+        {
+            // Every table filtering every other both ways has a huge number of paths; the
+            // search must still return promptly.
+            var model = new TabularModelHandler("AdventureWorks.bim").Model;
+            var tables = model.Tables.ToList();
+            var edges = tables.SelectMany(a => tables.Where(b => b != a)
+                .Select(b => new RelationshipEdits.FilterEdge { Source = a, Target = b })).ToList();
+
+            var watch = System.Diagnostics.Stopwatch.StartNew();
+            var found = RelationshipEdits.FindAmbiguities(edges);
+            watch.Stop();
+
+            Assert.IsTrue(found.Count > 0);
+            Assert.IsTrue(watch.ElapsedMilliseconds < 3000, $"Took {watch.ElapsedMilliseconds} ms");
+        }
+
+        [TestMethod]
         public void SavedNodeIsFoundByLineageTagThenName()
         {
             var layout = new DiagramLayout

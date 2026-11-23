@@ -26,7 +26,7 @@ namespace TabularEditor.UI.ModelDiagram
         private readonly CheckBox securityBoth = new CheckBox { Text = "Apply security filter in both directions", AutoSize = true };
         private readonly CheckBox referentialIntegrity = new CheckBox { Text = "Assume referential integrity", AutoSize = true };
         private readonly Button detect = new Button { Text = "Detect from data", AutoSize = true };
-        private readonly Label message = new Label { AutoSize = false, Height = 48, Dock = DockStyle.Fill };
+        private readonly Label message = new Label { AutoSize = false, Height = 72, Dock = DockStyle.Fill };
         private CancellationTokenSource detection;
         /// <summary>Why OK cannot be accepted right now; null when it can.</summary>
         private string currentError;
@@ -50,7 +50,7 @@ namespace TabularEditor.UI.ModelDiagram
             StartPosition = FormStartPosition.CenterParent;
             MinimizeBox = MaximizeBox = ShowInTaskbar = false;
             Font = new Font("Segoe UI", 9f);
-            ClientSize = new Size(560, 400);
+            ClientSize = new Size(560, 430);
             Padding = new Padding(14);
 
             var grid = new TableLayoutPanel { ColumnCount = 2, Dock = DockStyle.Fill };
@@ -108,8 +108,9 @@ namespace TabularEditor.UI.ModelDiagram
             ok.Click += (s, e) => Accept();
             FormClosed += (s, e) => detection?.Cancel();
 
-            LoadSpec(spec);
+            // Theme first: applying it resets label colours, which would hide an error shown on open.
             AppTheme.Apply(this);
+            LoadSpec(spec);
         }
 
         /// <summary>The settings the user accepted, or null on cancel.</summary>
@@ -178,6 +179,8 @@ namespace TabularEditor.UI.ModelDiagram
             var error = RelationshipEdits.Validate(spec, editing);
             if (error == null && spec.IsActive && RelationshipEdits.ConflictsWithActiveRelationship(spec.Column1.Table, spec.Column2.Table, editing))
                 error = "Another active relationship already joins these tables. Clear \"Make this relationship active\", or deactivate the other one first.";
+            if (error == null && spec.IsActive)
+                error = RelationshipEdits.FindNewAmbiguity(spec, editing);
             currentError = error;
             ShowMessage(error, isError: true);
         }
