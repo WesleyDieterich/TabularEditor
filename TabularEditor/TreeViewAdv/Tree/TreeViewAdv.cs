@@ -116,6 +116,13 @@ namespace Aga.Controls.Tree
             return !args.Cancel;
         }
 
+        /// <summary>
+        /// In <see cref="TreeSelectionMode.MultiSameParent"/> mode, lets the owner allow a Ctrl+click
+        /// selection of a node whose parent differs from the rest of the selection.
+        /// </summary>
+        [Browsable(false), DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+        public Func<TreeNodeAdv, bool> AllowCrossParentSelection { get; set; }
+
 		[Category("Behavior")]
 		public event EventHandler<TreeViewAdvEventArgs> Collapsing;
 		private void OnCollapsing(TreeNodeAdv node)

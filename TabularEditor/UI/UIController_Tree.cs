@@ -156,6 +156,9 @@ namespace TabularEditor.UI
             UI.TreeView.NodeMouseDoubleClick += TreeView_NodeMouseDoubleClick;
             UI.TreeView.KeyDown += TreeView_KeyDown;
             UI.TreeView.BeforeMultiSelect += TreeView_BeforeMultiSelect;
+            // Columns may be Ctrl+click-selected across tables and display folders (e.g. for a filter dump measure):
+            UI.TreeView.AllowCrossParentSelection = node =>
+                node.Tag is Column && UI.TreeView.SelectedNodes.All(n => n.Tag is Column);
             TreeView_NameCol.EditorShowing += TvName_EditorShowing;
 
             UI.TreeView.DragLeave += TreeView_DragLeave;

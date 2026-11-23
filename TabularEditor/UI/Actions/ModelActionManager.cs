@@ -95,7 +95,7 @@ namespace TabularEditor.UI.Actions
             Add(new Separator());
 
             // "Create New Display Folder"
-            Add(new Action((s, m) => Governance.AllowEditProperty(s, TOMWrapper.Properties.DISPLAYFOLDER) && s.Count >= 1, 
+            Add(new Action((s, m) => Governance.AllowEditProperty(s, TOMWrapper.Properties.DISPLAYFOLDER) && s.Count >= 1 && SingleTable(s),
                 (s, m) => {
                     var orgDF = (s.Direct.FirstOrDefault() as IFolderObject)?.GetDisplayFolder(Handler.Tree.Culture);
                     var newDF = string.IsNullOrWhiteSpace(orgDF) ? "New folder" : (orgDF + @"\New folder"); ;
@@ -121,7 +121,7 @@ namespace TabularEditor.UI.Actions
                 (s, m) => (s.Table as CalculatedTable).AddCalculatedTableColumn(displayFolder: s.CurrentFolder).Vis().Edit(), (s, m) => @"Create New\Calculated Table Column", true, Context.Table | Context.TableObject));
 
             // Add hierarchy:
-            Add(new Action((s, m) => Governance.AllowCreate(typeof(Hierarchy)) && (s.Count == 1 || s.Context.HasX(Context.TableObject)), 
+            Add(new Action((s, m) => Governance.AllowCreate(typeof(Hierarchy)) && (s.Count == 1 || s.Context.HasX(Context.TableObject)) && SingleTable(s),
                 (s, m) => s.Table.AddHierarchy(displayFolder: s.CurrentFolder, levels: s.Direct.OfType<Column>().ToArray()).Expand().Vis().Edit(), 
                 (s, m) => @"Create New\Hierarchy", true, Context.CalculationGroupTable | Context.Table | Context.TableObject, Keys.Alt | Keys.D3));
 
@@ -136,8 +136,24 @@ namespace TabularEditor.UI.Actions
 
             Add(new Separator(@"Create New"));
 
+            // Filter dump measure (debugging aid à la DAX Studio):
+            const Context filterDumpSelection = Context.Table | Context.CalculationGroupTable | Context.TableObject | Context.Level;
+            const Context filterDumpAll = filterDumpSelection | Context.Model | Context.Tables;
+            Add(new Action((s, m) => Governance.AllowCreate(typeof(Measure)) && FilterDump.ColumnsFromSelection(s).Count > 0,
+                (s, m) => AddFilterDumpMeasure(s, m, FilterDump.ColumnsFromSelection(s)),
+                (s, m) => @"Filter Dump Measure\Add to Model (Selection)", true, filterDumpSelection));
+            Add(new Action((s, m) => Governance.AllowCreate(typeof(Measure)) && m.Tables.Any(),
+                (s, m) => AddFilterDumpMeasure(s, m, FilterDump.AllColumns(m)),
+                (s, m) => @"Filter Dump Measure\Add to Model (All Tables)", true, filterDumpAll));
+            Add(new Action((s, m) => FilterDump.ColumnsFromSelection(s).Count > 0,
+                (s, m) => DefineFilterDumpInQuery(s, m, FilterDump.ColumnsFromSelection(s)),
+                (s, m) => @"Filter Dump Measure\Define in DAX Query (Selection)", true, filterDumpSelection));
+            Add(new Action((s, m) => m.Tables.Any(),
+                (s, m) => DefineFilterDumpInQuery(s, m, FilterDump.AllColumns(m)),
+                (s, m) => @"Filter Dump Measure\Define in DAX Query (All Tables)", true, filterDumpAll));
+
             Add(new Action(
-                (s, m) => Governance.AllowCreate(typeof(Partition)) && s.Count == 1 && s.Table.Partitions.GetSupportedPartitionTypes().Contains(typeof(Partition)), 
+                (s, m) => Governance.AllowCreate(typeof(Partition)) && s.Count == 1 && s.Table.Partitions.GetSupportedPartitionTypes().Contains(typeof(Partition)),
                 (s, m) => Partition.CreateNew(s.Table).Edit(), 
                 (s, m) => @"Create New\Partition" + (Handler.CompatibilityLevel >= 1400 ? " (Legacy)" : ""), true, Context.Table));
             Add(new Action(
@@ -199,7 +215,7 @@ namespace TabularEditor.UI.Actions
             Add(new CreateRelationshipAction(CreateRelationshipDirection.From));
 
             // "Add to Hierarchy..."
-            Add(new MultiAction((s, m, p) => Governance.AllowEditProperty(ObjectType.Hierarchy, TOMWrapper.Properties.LEVELS) && (
+            Add(new MultiAction((s, m, p) => Governance.AllowEditProperty(ObjectType.Hierarchy, TOMWrapper.Properties.LEVELS) && SingleTable(s) && (
                 // Action enabled only when table contains at least one hierarchy:
                 ((p == null) && s.Table.Hierarchies.Any()) ||
                 // ...and none of the selected columns are already present as levels in the hierarchy:
@@ -387,6 +403,25 @@ namespace TabularEditor.UI.Actions
             if(mr == DialogResult.Cancel || string.IsNullOrEmpty(tmdlForm.Tmdl)) return;
 
             m.ImportTmdl(tmdlForm.Tmdl, new TmdlImportOptions { Replace = tmdlForm.Replace });
+        }
+
+        /// <summary>True when every selected table object belongs to the same table (columns can be selected across tables).</summary>
+        private static bool SingleTable(UITreeSelection s) =>
+            s.OfType<ITabularTableObject>().Select(o => o.Table).Distinct().Take(2).Count() <= 1;
+
+        private static void AddFilterDumpMeasure(UITreeSelection s, Model m, List<Column> columns)
+        {
+            var host = FilterDump.HostTable(s, m);
+            if (host == null) return;
+            host.AddMeasure(FilterDump.UniqueMeasureName(m, host), FilterDump.BuildExpression(columns)).Vis().Edit();
+        }
+
+        private static void DefineFilterDumpInQuery(UITreeSelection s, Model m, List<Column> columns)
+        {
+            var host = FilterDump.HostTable(s, m);
+            if (host == null) return;
+            FormMain.Singleton.DefineInDaxQuery(
+                FilterDump.BuildQueryDefinition(host, FilterDump.UniqueMeasureName(m, host), columns));
         }
 
         private void EditColumnMappings(Calendar c)

@@ -207,6 +207,37 @@ namespace TabularEditor.UI
         public void Comment() => editor.InsertLinePrefix("//");
         public void Uncomment() => editor.RemoveLinePrefix("//");
 
+        private static readonly System.Text.RegularExpressions.Regex leadingDefine = new System.Text.RegularExpressions.Regex(
+            @"\A(?:\s+|//[^\n]*|--[^\n]*|/\*.*?\*/)*DEFINE\b",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline);
+
+        /// <summary>
+        /// Adds a query-scoped definition (e.g. "    MEASURE 'T'[M] = ...\r\n") to the query: inside the
+        /// existing leading DEFINE block if there is one, otherwise in a new DEFINE block at the top.
+        /// The edit is a single undoable step and the caret ends up after the inserted text.
+        /// </summary>
+        public void InsertDefinition(string definition)
+        {
+            var text = editor.Text;
+            var match = leadingDefine.Match(text);
+            int position;
+            string insert;
+            if (match.Success)
+            {
+                position = match.Index + match.Length;
+                insert = "\r\n" + definition.TrimEnd('\r', '\n');
+            }
+            else
+            {
+                position = 0;
+                insert = "DEFINE\r\n" + definition + "\r\n";
+            }
+            editor.Selection.Start = editor.PositionToPlace(position);
+            editor.InsertText(insert);
+            editor.DoCaretVisible();
+            editor.Focus();
+        }
+
         private string QueryText => editor.Selection.IsEmpty ? editor.Text : editor.SelectedText;
 
         private void ScheduleHighlight()

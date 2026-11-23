@@ -107,6 +107,14 @@ namespace TabularEditor.UI
             return editor.ExecuteAsync();
         }
 
+        /// <summary>Adds a query-scoped definition to the active query tab, opening a new tab if none is open.</summary>
+        public void InsertDefinition(string definition)
+        {
+            if (previewOnly) return;
+            if (active == null) AddTab();
+            active.Editor.InsertDefinition(definition);
+        }
+
         private void AddTab() => AddTab(new QueryTab(new DaxQueryEditor(getHandler), $"Query {nextNumber++}"));
 
         private void AddTab(QueryTab tab)

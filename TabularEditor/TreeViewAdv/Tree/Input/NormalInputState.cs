@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using System.Windows.Forms;
 
@@ -176,7 +177,9 @@ namespace Aga.Controls.Tree
 
             if (Tree.SelectionMode == TreeSelectionMode.MultiSameParent)
             {
-                canSelect = (Tree.SelectionStart == null || node.Parent == Tree.SelectionStart.Parent);
+                canSelect = Tree.SelectionStart == null
+                    || (node.Parent == Tree.SelectionStart.Parent && Tree.SelectedNodes.All(n => n.Parent == node.Parent))
+                    || (Tree.AllowCrossParentSelection?.Invoke(node) ?? false);
             }
             else
                 canSelect = true;

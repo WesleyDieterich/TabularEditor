@@ -174,6 +174,12 @@ Selected.Hierarchies.ForEach(item => item.TranslatedDisplayFolders.SetAll(item.D
             if (refreshHistory != null) AppTheme.ApplyWorkspaceControl(refreshHistory);
         }
 
+        internal void DefineInDaxQuery(string definition)
+        {
+            tabCodeEditors.SelectedTab = pgDaxScript;
+            daxQueryTabs.InsertDefinition(definition);
+        }
+
         internal void PreviewTableData(Table table)
         {
             if (UI.Handler?.IsConnected != true || table.IsRemoved) return;

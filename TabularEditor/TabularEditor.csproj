@@ -302,6 +302,7 @@
     <Compile Include="UI\DaxIntelliSense.cs" />
     <Compile Include="UI\DaxQueryEditor.cs" />
     <Compile Include="UI\FilterCalendar.cs" />
+    <Compile Include="UI\FilterDump.cs" />
     <Compile Include="UI\DaxQueryTabs.cs" />
     <Compile Include="UI\ModelDiagram\AutoLayout.cs" />
     <Compile Include="UI\ModelDiagram\DiagramCanvas.cs">
