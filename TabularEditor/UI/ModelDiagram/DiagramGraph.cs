@@ -41,12 +41,58 @@ namespace TabularEditor.UI.ModelDiagram
         public SizeF Size { get; set; }
         public RectangleF Bounds => new RectangleF(Location, Size);
 
-        public int IndexOf(ITabularNamedObject field)
+        /// <summary>A collapsed card shows only its key fields.</summary>
+        public bool Collapsed { get; set; }
+        /// <summary>The user resized the card; otherwise its height follows the fields.</summary>
+        public bool HasCustomSize { get; set; }
+        /// <summary>The height the user chose, used whenever the card is expanded.</summary>
+        public float CustomHeight { get; set; }
+
+        public IReadOnlyList<DiagramField> DisplayFields => Collapsed ? Fields.Where(f => f.IsKey).ToList() : Fields;
+
+        /// <summary>The height that fits the displayed fields (up to the per-card maximum).</summary>
+        public float AutoHeight => CardMetrics.HeightFor(DisplayFields.Count);
+
+        /// <summary>
+        /// How many field rows fit in the card, and whether a "+ N more" row replaces the last one.
+        /// </summary>
+        public int VisibleFieldRows(out bool hasMore)
         {
-            for (var i = 0; i < Fields.Count; i++)
-                if (ReferenceEquals(Fields[i].Object, field)) return i;
-            return -1;
+            var count = DisplayFields.Count;
+            var rows = Math.Max(0, (int)Math.Floor((Size.Height - CardMetrics.HeaderHeight - CardMetrics.Padding + 0.5f) / CardMetrics.RowHeight));
+            hasMore = count > rows;
+            return hasMore ? Math.Max(0, rows - 1) : count;
         }
+
+        /// <summary>
+        /// Sets the height: the key fields when collapsed, the user's height when resized,
+        /// otherwise enough for the fields.
+        /// </summary>
+        public void FitHeight()
+        {
+            var width = Size.Width > 0 ? Size.Width : CardMetrics.Width;
+            var height = !Collapsed && HasCustomSize && CustomHeight > 0 ? CustomHeight : AutoHeight;
+            Size = new SizeF(width, height);
+        }
+    }
+
+    /// <summary>Card dimensions in diagram (world) units at 100% zoom.</summary>
+    internal static class CardMetrics
+    {
+        public const float Width = 220f;
+        public const float MinWidth = 140f;
+        public const float HeaderHeight = 30f;
+        public const float RowHeight = 20f;
+        public const float Padding = 6f;
+        public const int MaxAutoRows = 12;
+
+        public static float HeightFor(int fieldCount)
+        {
+            var rows = Math.Min(fieldCount, MaxAutoRows) + (fieldCount > MaxAutoRows ? 1 : 0);
+            return HeaderHeight + rows * RowHeight + Padding;
+        }
+
+        public static float MinHeight => HeaderHeight + RowHeight + Padding;
     }
 
     internal sealed class DiagramEdge
@@ -93,7 +139,25 @@ namespace TabularEditor.UI.ModelDiagram
             if (nodes.Remove(node)) nodes.Add(node);
         }
 
-        public static DiagramGraph Build(Model model)
+        /// <summary>
+        /// Tables directly related to the table, in either direction, excluding the table itself.
+        /// </summary>
+        public static IEnumerable<Table> RelatedTables(Table table)
+        {
+            if (table?.Model == null) return Enumerable.Empty<Table>();
+            return table.Model.Relationships.OfType<SingleColumnRelationship>()
+                .Where(r => r.FromColumn != null && r.ToColumn != null)
+                .SelectMany(r => r.FromColumn.Table == table ? new[] { r.ToColumn.Table }
+                    : r.ToColumn.Table == table ? new[] { r.FromColumn.Table } : new Table[0])
+                .Where(t => t != table)
+                .Distinct();
+        }
+
+        /// <summary>
+        /// Builds the graph for the tables <paramref name="include"/> accepts (all tables when
+        /// null). Relationships are included only when both their tables are.
+        /// </summary>
+        public static DiagramGraph Build(Model model, Func<Table, bool> include = null)
         {
             if (model == null) return Empty;
 
@@ -106,6 +170,7 @@ namespace TabularEditor.UI.ModelDiagram
             var byTable = new Dictionary<Table, DiagramNode>();
             foreach (var table in model.Tables.OrderBy(t => t.Name, StringComparer.CurrentCultureIgnoreCase))
             {
+                if (include != null && !include(table)) continue;
                 var node = new DiagramNode(table, BuildFields(table, related));
                 nodes.Add(node);
                 byTable[table] = node;

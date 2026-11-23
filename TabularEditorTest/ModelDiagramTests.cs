@@ -30,7 +30,7 @@ namespace TabularEditor
             handler = new TabularModelHandler("AdventureWorks.bim");
             var graph = DiagramGraph.Build(handler.Model);
             foreach (var node in graph.Nodes)
-                node.Size = new SizeF(DiagramCanvas.CardWidth, DiagramCanvas.CardHeight(node.Fields.Count));
+                node.FitHeight();
             return graph;
         }
 
@@ -143,6 +143,131 @@ namespace TabularEditor
             DiagramLayoutStore.Save(other, new DiagramLayoutFile(), folder);
             File.Copy(DiagramLayoutStore.GetPath(other, folder), DiagramLayoutStore.GetPath(key, folder), overwrite: true);
             Assert.IsNull(DiagramLayoutStore.Load(key, folder));
+        }
+
+        [TestMethod]
+        public void CustomLayoutShowsOnlyItsTablesAndTheirRelationships()
+        {
+            var handler = new TabularModelHandler("AdventureWorks.bim");
+            var layout = new DiagramLayout { Name = "Sales" };
+            layout.Add("Internet Sales", null);
+            layout.Add("Customer", null);
+            layout.Add("Product Category", null);
+
+            var graph = DiagramGraph.Build(handler.Model, t => layout.Includes(t.Name, t.LineageTag));
+
+            CollectionAssert.AreEquivalent(new[] { "Customer", "Internet Sales", "Product Category" }, graph.Nodes.Select(n => n.Table.Name).ToList());
+            Assert.IsTrue(graph.Edges.Count > 0);
+            Assert.IsTrue(graph.Edges.All(e => graph.Nodes.Contains(e.From) && graph.Nodes.Contains(e.To)),
+                "Relationships to tables outside the layout must be left out.");
+            Assert.IsTrue(new DiagramLayout().Includes("Anything", null), "\"All tables\" includes every table.");
+        }
+
+        [TestMethod]
+        public void AddingAndRemovingTablesFromALayout()
+        {
+            var layout = new DiagramLayout { Name = "Custom" };
+            Assert.IsTrue(layout.Add("Sales", "tag"));
+            Assert.IsFalse(layout.Add("Sales renamed", "tag"), "The same table (by lineage tag) is not added twice.");
+            Assert.IsFalse(layout.Find("Sales", "tag").IsPlaced, "New tables wait for auto-layout.");
+
+            Assert.IsTrue(layout.Remove("Sales", "tag"));
+            Assert.AreEqual(0, layout.Nodes.Count);
+
+            var all = new DiagramLayout();
+            all.Nodes.Add(new DiagramNodeLayout { Table = "Sales" });
+            Assert.IsFalse(all.Remove("Sales", null), "Tables cannot be removed from \"All tables\".");
+        }
+
+        [TestMethod]
+        public void LayoutNamesAreUniqueAndAllTablesIsProtected()
+        {
+            var file = new DiagramLayoutFile();
+            var first = file.AddLayout();
+            var second = file.AddLayout();
+
+            Assert.AreEqual(DiagramLayout.AllTables, file.Layouts[0].Name, "\"All tables\" is created first.");
+            Assert.AreEqual("Layout 1", first.Name);
+            Assert.AreEqual("Layout 2", second.Name);
+
+            Assert.IsNotNull(file.ValidateName(second, "layout 1"), "Names are unique, ignoring case.");
+            Assert.IsNotNull(file.ValidateName(second, "  "));
+            Assert.IsNotNull(file.ValidateName(file.AllTablesLayout, "Renamed"));
+            Assert.IsNull(file.ValidateName(second, "Layout 2"), "Keeping its own name is fine.");
+            Assert.IsNull(file.ValidateName(second, "Finance"));
+
+            Assert.IsFalse(file.Remove(file.AllTablesLayout));
+            Assert.IsTrue(file.Remove(first));
+            Assert.AreEqual("Layout 1", file.AddLayout().Name, "Freed names are reused.");
+        }
+
+        [TestMethod]
+        public void UnplacedTablesSurviveSaving()
+        {
+            const string key = "file:C:\\models\\Unplaced.bim";
+            var file = new DiagramLayoutFile();
+            var custom = file.AddLayout();
+            custom.Add("Sales", null);
+            custom.Nodes[0].Collapsed = true;
+            custom.Nodes[0].Width = 300;
+
+            DiagramLayoutStore.Save(key, file, folder);
+            var loaded = DiagramLayoutStore.Load(key, folder).Find("Layout 1").Nodes.Single();
+
+            Assert.IsFalse(loaded.IsPlaced);
+            Assert.IsTrue(loaded.Collapsed);
+            Assert.AreEqual(300f, loaded.Width);
+        }
+
+        [TestMethod]
+        public void RelatedTablesFollowRelationshipsBothWays()
+        {
+            var handler = new TabularModelHandler("AdventureWorks.bim");
+            var geography = handler.Model.Tables["Geography"];
+
+            var related = DiagramGraph.RelatedTables(geography).Select(t => t.Name).ToList();
+
+            CollectionAssert.Contains(related, "Customer", "Many side pointing at Geography.");
+            CollectionAssert.Contains(related, "Sales Territory", "One side Geography points at.");
+            CollectionAssert.DoesNotContain(related, "Geography");
+            Assert.AreEqual(related.Count, related.Distinct().Count());
+        }
+
+        [TestMethod]
+        public void CollapsedCardsShowKeyFieldsAndKeepTheCustomHeight()
+        {
+            var graph = LoadGraph(out _);
+            var node = graph.Nodes.First(n => n.Fields.Count(f => f.IsKey) >= 1 && n.Fields.Count > 5);
+            var keys = node.Fields.Count(f => f.IsKey);
+
+            node.HasCustomSize = true;
+            node.CustomHeight = 400;
+            node.FitHeight();
+            Assert.AreEqual(400f, node.Size.Height);
+
+            node.Collapsed = true;
+            node.FitHeight();
+            Assert.AreEqual(keys, node.DisplayFields.Count);
+            Assert.AreEqual(CardMetrics.HeightFor(keys), node.Size.Height);
+
+            node.Collapsed = false;
+            node.FitHeight();
+            Assert.AreEqual(400f, node.Size.Height, "Expanding restores the height the user chose.");
+        }
+
+        [TestMethod]
+        public void ShortCardsShowAMoreRow()
+        {
+            var graph = LoadGraph(out _);
+            var node = graph.Nodes.First(n => n.Fields.Count > 6);
+            node.HasCustomSize = true;
+            node.CustomHeight = CardMetrics.HeaderHeight + 4 * CardMetrics.RowHeight + CardMetrics.Padding;
+            node.FitHeight();
+
+            var rows = node.VisibleFieldRows(out var hasMore);
+
+            Assert.IsTrue(hasMore);
+            Assert.AreEqual(3, rows, "Four rows fit: three fields and the \"+ N more\" row.");
         }
 
         [TestMethod]

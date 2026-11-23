@@ -10,57 +10,63 @@ using TabularEditor.TOMWrapper;
 namespace TabularEditor.UI.ModelDiagram
 {
     /// <summary>
-    /// Draws the model diagram and handles panning, zooming, selecting and moving tables.
-    /// Everything is drawn in diagram (world) coordinates through a transform:
+    /// Draws the model diagram and handles panning, zooming, selecting, moving, resizing and
+    /// collapsing tables. Everything is drawn in diagram (world) coordinates through a transform:
     /// screen = (world - Scroll) * Zoom.
     /// </summary>
     internal sealed class DiagramCanvas : Control
     {
-        internal const float CardWidth = 220f;
-        internal const float HeaderHeight = 30f;
-        internal const float RowHeight = 20f;
-        internal const float CardPadding = 6f;
-        internal const int MaxVisibleFields = 12;
         internal const float MinZoom = 0.1f;
         internal const float MaxZoom = 3f;
         private const float EdgeHitTolerance = 5f;
-        private const int DragThreshold = 4;
-
         private const float ParallelEdgeSpacing = 10f;
+        private const float ResizeGrip = 12f;
+        private const float ChevronWidth = 24f;
+        private const int DragThreshold = 4;
 
         private DiagramGraph graph = DiagramGraph.Empty;
         /// <summary>Sideways offset of each edge, so several relationships between the same two tables stay apart.</summary>
         private Dictionary<DiagramEdge, float> edgeOffsets = new Dictionary<DiagramEdge, float>();
+        /// <summary>Objects selected in the model tree: drawn highlighted.</summary>
         private HashSet<ITabularNamedObject> selection = new HashSet<ITabularNamedObject>();
+        /// <summary>Tables selected in the diagram: moved together, targets of the context menu.</summary>
+        private HashSet<DiagramNode> selectedNodes = new HashSet<DiagramNode>();
         private HashSet<DiagramNode> searchMatches = new HashSet<DiagramNode>();
         private float zoom = 1f;
         private PointF scroll;
 
-        private enum DragMode { None, Pending, Pan, MoveNode }
+        private enum DragMode { None, Pending, Pan, MoveNodes, Resize, Marquee }
         private DragMode drag;
-        private Point dragStartScreen;
+        private Point dragStart;
         private PointF dragStartScroll;
-        private PointF dragNodeOffset;
+        private PointF dragStartWorld;
+        private Dictionary<DiagramNode, PointF> dragStartLocations;
+        private SizeF dragStartSize;
         private DiagramNode dragNode;
-        private object pressedTarget;
-        private object hoverTarget;
+        private RectangleF marquee;
+        private bool marqueeAdds;
+        private Hit pressed;
+        private Hit hover;
 
         public DiagramCanvas()
         {
             SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer |
                      ControlStyles.UserPaint | ControlStyles.ResizeRedraw | ControlStyles.Selectable, true);
             TabStop = true;
+            AllowDrop = true;
             Font = new Font("Segoe UI", 9f);
         }
 
-        /// <summary>A table, field or relationship was clicked.</summary>
+        /// <summary>A table, field or relationship was clicked (without Ctrl).</summary>
         public event EventHandler<ITabularNamedObject> ObjectClicked;
-        /// <summary>A table was moved by the user. Raised once, when the drag ends.</summary>
-        public event EventHandler NodesMoved;
+        /// <summary>Tables were moved, resized or collapsed. Raised once, when the gesture ends.</summary>
+        public event EventHandler LayoutChanged;
         /// <summary>Zoom or scroll position changed.</summary>
         public event EventHandler ViewChanged;
         /// <summary>The relationship or table under the mouse changed (null when over nothing).</summary>
         public event EventHandler<ITabularNamedObject> HoverChanged;
+        /// <summary>Right-click: the node under the mouse (null on empty space) and the screen position.</summary>
+        public event EventHandler<(DiagramNode Node, Point Location)> ContextMenuRequested;
 
         public DiagramGraph Graph
         {
@@ -69,14 +75,18 @@ namespace TabularEditor.UI.ModelDiagram
             {
                 graph = value ?? DiagramGraph.Empty;
                 edgeOffsets = ComputeEdgeOffsets(graph);
-                hoverTarget = null;
-                pressedTarget = null;
+                hover = null;
+                pressed = null;
                 dragNode = null;
                 drag = DragMode.None;
+                var tables = new HashSet<Table>(selectedNodes.Select(n => n.Table));
+                selectedNodes = new HashSet<DiagramNode>(graph.Nodes.Where(n => tables.Contains(n.Table)));
                 searchMatches.RemoveWhere(n => !graph.Nodes.Contains(n));
                 Invalidate();
             }
         }
+
+        public IReadOnlyCollection<DiagramNode> SelectedNodes => selectedNodes;
 
         public float Zoom
         {
@@ -95,9 +105,18 @@ namespace TabularEditor.UI.ModelDiagram
             }
         }
 
-        public void SetSelection(IEnumerable<ITabularNamedObject> objects)
+        /// <summary>Mirrors the model tree's selection: highlights those objects and selects their tables.</summary>
+        public void SetSelection(IEnumerable<ITabularNamedObject> objects, bool selectTables)
         {
             selection = new HashSet<ITabularNamedObject>(objects ?? Enumerable.Empty<ITabularNamedObject>());
+            if (selectTables)
+                selectedNodes = new HashSet<DiagramNode>(graph.Nodes.Where(n => selection.Contains(n.Table)));
+            Invalidate();
+        }
+
+        public void SelectNodes(IEnumerable<DiagramNode> nodes)
+        {
+            selectedNodes = new HashSet<DiagramNode>(nodes);
             Invalidate();
         }
 
@@ -107,16 +126,9 @@ namespace TabularEditor.UI.ModelDiagram
             Invalidate();
         }
 
-        /// <summary>Height of a card for the given number of fields, in world units.</summary>
-        internal static float CardHeight(int fieldCount)
-        {
-            var rows = Math.Min(fieldCount, MaxVisibleFields) + (fieldCount > MaxVisibleFields ? 1 : 0);
-            return HeaderHeight + rows * RowHeight + CardPadding;
-        }
-
         #region Coordinates
 
-        private PointF ToWorld(PointF screen) => new PointF(screen.X / zoom + scroll.X, screen.Y / zoom + scroll.Y);
+        public PointF ToWorld(PointF screen) => new PointF(screen.X / zoom + scroll.X, screen.Y / zoom + scroll.Y);
         private PointF ToScreen(PointF world) => new PointF((world.X - scroll.X) * zoom, (world.Y - scroll.Y) * zoom);
 
         private void SetZoom(float value, PointF anchorScreen)
@@ -158,25 +170,38 @@ namespace TabularEditor.UI.ModelDiagram
 
         #region Hit testing
 
-        private sealed class FieldHit
+        private enum HitKind { Header, Field, More, Chevron, ResizeGrip, Edge }
+
+        private sealed class Hit
         {
+            public HitKind Kind;
             public DiagramNode Node;
             public DiagramField Field;
+            public DiagramEdge Edge;
+
+            public ITabularNamedObject Object =>
+                Kind == HitKind.Edge ? Edge.Relationship : Kind == HitKind.Field ? Field.Object : (ITabularNamedObject)Node.Table;
         }
 
-        /// <summary>Returns a DiagramNode (header or card), FieldHit, DiagramEdge, or null.</summary>
-        private object HitTest(Point screen)
+        private Hit HitTest(Point screen)
         {
             var world = ToWorld(screen);
             // Topmost card first: cards are drawn in list order, so the last one is on top.
             for (var i = graph.Nodes.Count - 1; i >= 0; i--)
             {
                 var node = graph.Nodes[i];
-                if (!node.Bounds.Contains(world)) continue;
-                var row = (int)Math.Floor((world.Y - node.Location.Y - HeaderHeight) / RowHeight);
-                if (row >= 0 && row < Math.Min(node.Fields.Count, MaxVisibleFields))
-                    return new FieldHit { Node = node, Field = node.Fields[row] };
-                return node;
+                var bounds = node.Bounds;
+                if (!bounds.Contains(world)) continue;
+
+                if (world.X >= bounds.Right - ResizeGrip && world.Y >= bounds.Bottom - ResizeGrip)
+                    return new Hit { Kind = HitKind.ResizeGrip, Node = node };
+                if (world.Y < bounds.Y + CardMetrics.HeaderHeight)
+                    return new Hit { Kind = world.X >= bounds.Right - ChevronWidth ? HitKind.Chevron : HitKind.Header, Node = node };
+
+                var row = (int)Math.Floor((world.Y - bounds.Y - CardMetrics.HeaderHeight) / CardMetrics.RowHeight);
+                var visible = node.VisibleFieldRows(out var hasMore);
+                if (row >= 0 && row < visible) return new Hit { Kind = HitKind.Field, Node = node, Field = node.DisplayFields[row] };
+                return new Hit { Kind = hasMore && row == visible ? HitKind.More : HitKind.Header, Node = node };
             }
 
             DiagramEdge best = null;
@@ -191,18 +216,7 @@ namespace TabularEditor.UI.ModelDiagram
                     best = edge;
                 }
             }
-            return best;
-        }
-
-        private static ITabularNamedObject ObjectOf(object target)
-        {
-            switch (target)
-            {
-                case FieldHit f: return f.Field.Object;
-                case DiagramNode n: return n.Table;
-                case DiagramEdge e: return e.Relationship;
-                default: return null;
-            }
+            return best == null ? null : new Hit { Kind = HitKind.Edge, Edge = best };
         }
 
         private static float DistanceToSegment(PointF p, PointF a, PointF b)
@@ -296,8 +310,9 @@ namespace TabularEditor.UI.ModelDiagram
         {
             base.OnMouseDown(e);
             Focus();
-            dragStartScreen = e.Location;
+            dragStart = e.Location;
             dragStartScroll = scroll;
+            dragStartWorld = ToWorld(e.Location);
 
             if (e.Button == MouseButtons.Middle)
             {
@@ -305,14 +320,30 @@ namespace TabularEditor.UI.ModelDiagram
                 Cursor = Cursors.SizeAll;
                 return;
             }
+
+            pressed = HitTest(e.Location);
+            dragNode = pressed?.Node;
+
+            if (e.Button == MouseButtons.Right)
+            {
+                // Right-clicking a table outside the selection selects just that table, as in Explorer.
+                if (dragNode != null && !selectedNodes.Contains(dragNode)) SelectNodes(new[] { dragNode });
+                return;
+            }
             if (e.Button != MouseButtons.Left) return;
 
-            pressedTarget = HitTest(e.Location);
-            dragNode = pressedTarget is FieldHit f ? f.Node : pressedTarget as DiagramNode;
-            if (dragNode != null)
+            if (pressed?.Kind == HitKind.ResizeGrip)
             {
-                var world = ToWorld(e.Location);
-                dragNodeOffset = new PointF(world.X - dragNode.Location.X, world.Y - dragNode.Location.Y);
+                drag = DragMode.Resize;
+                dragStartSize = dragNode.Size;
+                return;
+            }
+            if (pressed == null && (ModifierKeys & Keys.Shift) != 0)
+            {
+                drag = DragMode.Marquee;
+                marqueeAdds = (ModifierKeys & Keys.Control) != 0;
+                marquee = RectangleF.Empty;
+                return;
             }
             drag = DragMode.Pending;
         }
@@ -320,40 +351,72 @@ namespace TabularEditor.UI.ModelDiagram
         protected override void OnMouseMove(MouseEventArgs e)
         {
             base.OnMouseMove(e);
+            var world = ToWorld(e.Location);
+
             if (drag == DragMode.Pending)
             {
-                if (Math.Abs(e.X - dragStartScreen.X) < DragThreshold && Math.Abs(e.Y - dragStartScreen.Y) < DragThreshold) return;
-                drag = dragNode != null ? DragMode.MoveNode : DragMode.Pan;
-                if (drag == DragMode.MoveNode) graph.BringToFront(dragNode);
+                if (Math.Abs(e.X - dragStart.X) < DragThreshold && Math.Abs(e.Y - dragStart.Y) < DragThreshold) return;
+                if (dragNode != null)
+                {
+                    // Dragging a table outside the selection moves just that table.
+                    if (!selectedNodes.Contains(dragNode)) selectedNodes = new HashSet<DiagramNode> { dragNode };
+                    foreach (var n in graph.Nodes.Where(selectedNodes.Contains).ToList()) graph.BringToFront(n);
+                    dragStartLocations = selectedNodes.ToDictionary(n => n, n => n.Location);
+                    drag = DragMode.MoveNodes;
+                }
+                else drag = DragMode.Pan;
                 Cursor = Cursors.SizeAll;
             }
 
-            if (drag == DragMode.MoveNode)
+            switch (drag)
             {
-                var world = ToWorld(e.Location);
-                dragNode.Location = new PointF(world.X - dragNodeOffset.X, world.Y - dragNodeOffset.Y);
-                Invalidate();
-                return;
-            }
-            if (drag == DragMode.Pan)
-            {
-                scroll = new PointF(
-                    dragStartScroll.X - (e.X - dragStartScreen.X) / zoom,
-                    dragStartScroll.Y - (e.Y - dragStartScreen.Y) / zoom);
-                Invalidate();
-                return;
+                case DragMode.MoveNodes:
+                    var dx = world.X - dragStartWorld.X;
+                    var dy = world.Y - dragStartWorld.Y;
+                    foreach (var kv in dragStartLocations) kv.Key.Location = new PointF(kv.Value.X + dx, kv.Value.Y + dy);
+                    Invalidate();
+                    return;
+
+                case DragMode.Pan:
+                    scroll = new PointF(
+                        dragStartScroll.X - (e.X - dragStart.X) / zoom,
+                        dragStartScroll.Y - (e.Y - dragStart.Y) / zoom);
+                    Invalidate();
+                    return;
+
+                case DragMode.Resize:
+                    var width = Math.Max(CardMetrics.MinWidth, dragStartSize.Width + world.X - dragStartWorld.X);
+                    var height = dragNode.Collapsed
+                        ? dragNode.Size.Height
+                        : Math.Max(CardMetrics.MinHeight, dragStartSize.Height + world.Y - dragStartWorld.Y);
+                    dragNode.Size = new SizeF(width, height);
+                    dragNode.HasCustomSize = true;
+                    if (!dragNode.Collapsed) dragNode.CustomHeight = height;
+                    Invalidate();
+                    return;
+
+                case DragMode.Marquee:
+                    marquee = RectangleF.FromLTRB(
+                        Math.Min(dragStartWorld.X, world.X), Math.Min(dragStartWorld.Y, world.Y),
+                        Math.Max(dragStartWorld.X, world.X), Math.Max(dragStartWorld.Y, world.Y));
+                    Invalidate();
+                    return;
             }
 
-            var hit = HitTest(e.Location);
-            Cursor = hit is DiagramEdge ? Cursors.Hand : Cursors.Default;
-            var hoverObject = ObjectOf(hit is FieldHit fh ? fh.Node : hit);
-            if (!Equals(ObjectOf(hoverTarget is FieldHit oh ? oh.Node : hoverTarget), hoverObject))
-            {
-                hoverTarget = hit;
-                HoverChanged?.Invoke(this, hoverObject);
-                Invalidate();
-            }
-            else hoverTarget = hit;
+            UpdateHover(HitTest(e.Location));
+        }
+
+        private void UpdateHover(Hit hit)
+        {
+            Cursor = hit?.Kind == HitKind.Edge || hit?.Kind == HitKind.Chevron ? Cursors.Hand
+                : hit?.Kind == HitKind.ResizeGrip ? Cursors.SizeNWSE : Cursors.Default;
+            // Hovering is reported per table or relationship, not per field.
+            var before = hover == null ? null : hover.Kind == HitKind.Edge ? (object)hover.Edge : hover.Node;
+            var after = hit == null ? null : hit.Kind == HitKind.Edge ? (object)hit.Edge : hit.Node;
+            hover = hit;
+            if (before == after) return;
+            HoverChanged?.Invoke(this, hit?.Kind == HitKind.Edge ? hit.Edge.Relationship : (ITabularNamedObject)hit?.Node?.Table);
+            Invalidate();
         }
 
         protected override void OnMouseUp(MouseEventArgs e)
@@ -363,22 +426,108 @@ namespace TabularEditor.UI.ModelDiagram
             drag = DragMode.None;
             Cursor = Cursors.Default;
 
-            if (mode == DragMode.Pending && e.Button == MouseButtons.Left)
+            if (e.Button == MouseButtons.Right && mode == DragMode.None)
             {
-                var obj = ObjectOf(pressedTarget);
-                if (obj != null) ObjectClicked?.Invoke(this, obj);
+                ContextMenuRequested?.Invoke(this, (dragNode, e.Location));
             }
-            else if (mode == DragMode.MoveNode) NodesMoved?.Invoke(this, EventArgs.Empty);
+            else if (mode == DragMode.Pending && e.Button == MouseButtons.Left)
+            {
+                HandleClick(pressed);
+            }
+            else if (mode == DragMode.MoveNodes || mode == DragMode.Resize)
+            {
+                LayoutChanged?.Invoke(this, EventArgs.Empty);
+            }
+            else if (mode == DragMode.Marquee)
+            {
+                var inside = graph.Nodes.Where(n => marquee.IntersectsWith(n.Bounds));
+                SelectNodes(marqueeAdds ? selectedNodes.Concat(inside) : inside);
+                marquee = RectangleF.Empty;
+            }
             else if (mode == DragMode.Pan) ViewChanged?.Invoke(this, EventArgs.Empty);
-            pressedTarget = null;
+
+            pressed = null;
             dragNode = null;
+            dragStartLocations = null;
+            Invalidate();
+        }
+
+        private void HandleClick(Hit hit)
+        {
+            var ctrl = (ModifierKeys & Keys.Control) != 0;
+            if (hit == null)
+            {
+                if (!ctrl) SelectNodes(Enumerable.Empty<DiagramNode>());
+                return;
+            }
+            if (hit.Kind == HitKind.Chevron)
+            {
+                SetCollapsed(selectedNodes.Contains(hit.Node) ? selectedNodes : new HashSet<DiagramNode> { hit.Node }, !hit.Node.Collapsed);
+                return;
+            }
+            if (hit.Kind == HitKind.Edge)
+            {
+                if (!ctrl) SelectNodes(Enumerable.Empty<DiagramNode>());
+                ObjectClicked?.Invoke(this, hit.Edge.Relationship);
+                return;
+            }
+            if (ctrl)
+            {
+                // Ctrl+click toggles the table in the diagram selection only.
+                var nodes = new HashSet<DiagramNode>(selectedNodes);
+                if (!nodes.Remove(hit.Node)) nodes.Add(hit.Node);
+                SelectNodes(nodes);
+                return;
+            }
+            SelectNodes(new[] { hit.Node });
+            ObjectClicked?.Invoke(this, hit.Kind == HitKind.Field ? hit.Field.Object : hit.Node.Table);
+        }
+
+        public void SetCollapsed(IEnumerable<DiagramNode> nodes, bool collapsed)
+        {
+            foreach (var node in nodes.ToList())
+            {
+                node.Collapsed = collapsed;
+                node.FitHeight();
+            }
+            Invalidate();
+            LayoutChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        /// <summary>Returns cards to the size that fits their fields.</summary>
+        public void ResetSize(IEnumerable<DiagramNode> nodes)
+        {
+            foreach (var node in nodes.ToList())
+            {
+                node.HasCustomSize = false;
+                node.CustomHeight = 0;
+                node.Size = new SizeF(CardMetrics.Width, node.AutoHeight);
+            }
+            Invalidate();
+            LayoutChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        protected override void OnMouseDoubleClick(MouseEventArgs e)
+        {
+            base.OnMouseDoubleClick(e);
+            var hit = HitTest(e.Location);
+            // Double-clicking "+ N more" grows the card to show every field.
+            if (hit?.Kind == HitKind.More)
+            {
+                var node = hit.Node;
+                node.HasCustomSize = true;
+                node.CustomHeight = CardMetrics.HeaderHeight + node.DisplayFields.Count * CardMetrics.RowHeight + CardMetrics.Padding;
+                node.FitHeight();
+                Invalidate();
+                LayoutChanged?.Invoke(this, EventArgs.Empty);
+            }
         }
 
         protected override void OnMouseLeave(EventArgs e)
         {
             base.OnMouseLeave(e);
-            if (hoverTarget == null) return;
-            hoverTarget = null;
+            if (hover == null) return;
+            hover = null;
             HoverChanged?.Invoke(this, null);
             Invalidate();
         }
@@ -416,9 +565,11 @@ namespace TabularEditor.UI.ModelDiagram
                 case Keys.Right: Scroll = new PointF(scroll.X + step, scroll.Y); break;
                 case Keys.Up: Scroll = new PointF(scroll.X, scroll.Y - step); break;
                 case Keys.Down: Scroll = new PointF(scroll.X, scroll.Y + step); break;
-                case Keys.Add: case Keys.Oemplus: if (e.Control) ZoomBy(1.25f); break;
-                case Keys.Subtract: case Keys.OemMinus: if (e.Control) ZoomBy(0.8f); break;
-                case Keys.D0: case Keys.NumPad0: if (e.Control) FitToWindow(); break;
+                case Keys.Add: case Keys.Oemplus: if (e.Control) ZoomBy(1.25f); else return; break;
+                case Keys.Subtract: case Keys.OemMinus: if (e.Control) ZoomBy(0.8f); else return; break;
+                case Keys.D0: case Keys.NumPad0: if (e.Control) FitToWindow(); else return; break;
+                case Keys.A: if (e.Control) SelectNodes(graph.Nodes); else return; break;
+                case Keys.Escape: SelectNodes(Enumerable.Empty<DiagramNode>()); break;
                 default: return;
             }
             e.Handled = true;
@@ -470,6 +621,9 @@ namespace TabularEditor.UI.ModelDiagram
             };
         }
 
+        /// <summary>Shown on an empty diagram, e.g. a new custom layout.</summary>
+        public string EmptyText { get; set; } = "No tables to show. Open or connect to a model.";
+
         protected override void OnPaint(PaintEventArgs e)
         {
             var palette = Palette.Current;
@@ -491,17 +645,26 @@ namespace TabularEditor.UI.ModelDiagram
                 foreach (var edge in graph.Edges) DrawEdge(g, edge, palette, header, detailed);
                 foreach (var node in graph.Nodes)
                 {
-                    var bounds = node.Bounds;
-                    if (!bounds.IntersectsWith(visible)) continue;
+                    if (!node.Bounds.IntersectsWith(visible)) continue;
                     DrawNode(g, node, palette, header, italic, detailed);
+                }
+            }
+
+            if (drag == DragMode.Marquee && !marquee.IsEmpty)
+            {
+                using (var fill = new SolidBrush(Color.FromArgb(40, palette.Accent)))
+                using (var pen = new Pen(palette.Accent, 1f / zoom) { DashPattern = new[] { 4f, 3f } })
+                {
+                    g.FillRectangle(fill, marquee);
+                    g.DrawRectangle(pen, marquee.X, marquee.Y, marquee.Width, marquee.Height);
                 }
             }
 
             if (graph.Nodes.Count == 0)
             {
                 g.ResetTransform();
-                TextRenderer.DrawText(g, "No tables to show. Open or connect to a model.", Font, ClientRectangle, palette.Muted,
-                    TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+                TextRenderer.DrawText(g, EmptyText, Font, ClientRectangle, palette.Muted,
+                    TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.WordBreak);
             }
         }
 
@@ -519,14 +682,16 @@ namespace TabularEditor.UI.ModelDiagram
         }
 
         private bool IsHighlighted(DiagramEdge edge) =>
-            selection.Contains(edge.Relationship) || ReferenceEquals(ObjectOf(hoverTarget), edge.Relationship);
+            selection.Contains(edge.Relationship) || (hover?.Kind == HitKind.Edge && hover.Edge == edge);
+
+        private bool IsSelected(DiagramNode node) => selectedNodes.Contains(node) || selection.Contains(node.Table);
 
         private void DrawEdge(Graphics g, DiagramEdge edge, Palette palette, Font labelFont, bool detailed)
         {
             if (!TryGetEdgeLine(edge, out var a, out var b)) return;
             var relationship = edge.Relationship;
             var highlighted = IsHighlighted(edge);
-            var related = selection.Contains(edge.From.Table) || selection.Contains(edge.To.Table);
+            var related = IsSelected(edge.From) || IsSelected(edge.To);
             var color = highlighted || related ? palette.Accent : palette.Line;
 
             using (var pen = new Pen(color, (highlighted ? 2.6f : 1.4f) / Math.Max(zoom, 0.5f)))
@@ -591,8 +756,8 @@ namespace TabularEditor.UI.ModelDiagram
         {
             var table = node.Table;
             var bounds = node.Bounds;
-            var selected = selection.Contains(table);
-            var hovered = ObjectOf(hoverTarget is FieldHit fh ? fh.Node : hoverTarget) == table;
+            var selected = IsSelected(node);
+            var hovered = hover != null && hover.Kind != HitKind.Edge && hover.Node == node;
             var border = selected ? palette.Accent : searchMatches.Contains(node) ? palette.Search : palette.CardBorder;
             var borderWidth = (selected || searchMatches.Contains(node) ? 2.2f : hovered ? 1.6f : 1f) / Math.Max(zoom, 0.5f);
 
@@ -600,36 +765,62 @@ namespace TabularEditor.UI.ModelDiagram
             using (var fill = new SolidBrush(palette.Card))
                 g.FillPath(fill, path);
 
-            var headerRect = new RectangleF(bounds.X, bounds.Y, bounds.Width, HeaderHeight);
+            var headerRect = new RectangleF(bounds.X, bounds.Y, bounds.Width, CardMetrics.HeaderHeight);
             var headerColor = table is CalculationGroupTable ? palette.HeaderCalcGroup
                 : table is CalculatedTable ? palette.HeaderCalculated : palette.Header;
-            using (var path = RoundedRect(headerRect, 6, bottom: false))
+            using (var path = RoundedRect(headerRect, 6, bottom: node.Collapsed && node.DisplayFields.Count == 0))
             using (var fill = new SolidBrush(headerColor))
                 g.FillPath(fill, path);
 
             using (var text = new SolidBrush(table.IsHidden ? palette.Muted : palette.Text))
             using (var format = new StringFormat(StringFormatFlags.NoWrap) { Trimming = StringTrimming.EllipsisCharacter, LineAlignment = StringAlignment.Center })
             {
-                g.DrawString(table.Name, headerFont, text, new RectangleF(headerRect.X + 10, headerRect.Y, headerRect.Width - 20, headerRect.Height), format);
+                g.DrawString(table.Name, headerFont, text,
+                    new RectangleF(headerRect.X + 10, headerRect.Y, headerRect.Width - 10 - ChevronWidth, headerRect.Height), format);
+                DrawChevron(g, new PointF(headerRect.Right - ChevronWidth / 2, headerRect.Y + headerRect.Height / 2), node.Collapsed,
+                    hovered ? palette.Text : palette.Muted);
 
                 if (detailed)
                 {
-                    var visibleCount = Math.Min(node.Fields.Count, MaxVisibleFields);
-                    for (var i = 0; i < visibleCount; i++)
-                        DrawField(g, node.Fields[i], new RectangleF(bounds.X, bounds.Y + HeaderHeight + i * RowHeight, bounds.Width, RowHeight), palette, italic, format);
+                    var visibleRows = node.VisibleFieldRows(out var hasMore);
+                    var fields = node.DisplayFields;
+                    for (var i = 0; i < visibleRows; i++)
+                        DrawField(g, fields[i],
+                            new RectangleF(bounds.X, bounds.Y + CardMetrics.HeaderHeight + i * CardMetrics.RowHeight, bounds.Width, CardMetrics.RowHeight),
+                            palette, italic, format);
 
-                    if (node.Fields.Count > MaxVisibleFields)
+                    if (hasMore)
                     {
-                        var more = new RectangleF(bounds.X + 28, bounds.Y + HeaderHeight + visibleCount * RowHeight, bounds.Width - 36, RowHeight);
+                        var more = new RectangleF(bounds.X + 28, bounds.Y + CardMetrics.HeaderHeight + visibleRows * CardMetrics.RowHeight,
+                            bounds.Width - 36, CardMetrics.RowHeight);
                         using (var muted = new SolidBrush(palette.Muted))
-                            g.DrawString($"+ {node.Fields.Count - MaxVisibleFields} more", italic, muted, more, format);
+                            g.DrawString($"+ {fields.Count - visibleRows} more", italic, muted, more, format);
                     }
                 }
             }
 
+            if (hovered && !node.Collapsed) DrawResizeGrip(g, bounds, palette.Muted);
+
             using (var path = RoundedRect(bounds, 6))
             using (var pen = new Pen(border, borderWidth))
                 g.DrawPath(pen, path);
+        }
+
+        private static void DrawChevron(Graphics g, PointF c, bool collapsed, Color color)
+        {
+            using (var pen = new Pen(color, 1.4f))
+            {
+                // ▾ when expanded, ▸ when collapsed.
+                if (collapsed) g.DrawLines(pen, new[] { new PointF(c.X - 2, c.Y - 4), new PointF(c.X + 2, c.Y), new PointF(c.X - 2, c.Y + 4) });
+                else g.DrawLines(pen, new[] { new PointF(c.X - 4, c.Y - 2), new PointF(c.X, c.Y + 2), new PointF(c.X + 4, c.Y - 2) });
+            }
+        }
+
+        private static void DrawResizeGrip(Graphics g, RectangleF bounds, Color color)
+        {
+            using (var pen = new Pen(color, 1f))
+                for (var i = 1; i <= 3; i++)
+                    g.DrawLine(pen, bounds.Right - 3 * i - 2, bounds.Bottom - 3, bounds.Right - 3, bounds.Bottom - 3 * i - 2);
         }
 
         private void DrawField(Graphics g, DiagramField field, RectangleF row, Palette palette, Font italic, StringFormat format)
@@ -655,7 +846,7 @@ namespace TabularEditor.UI.ModelDiagram
         }
 
         /// <summary>A small shape per field kind: dot for keys, square for columns, ∑-like bars for measures.</summary>
-        private void DrawFieldGlyph(Graphics g, DiagramField field, PointF c, Color color)
+        private static void DrawFieldGlyph(Graphics g, DiagramField field, PointF c, Color color)
         {
             using (var pen = new Pen(color, 1.2f))
             using (var brush = new SolidBrush(color))

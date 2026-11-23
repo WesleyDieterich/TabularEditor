@@ -21,6 +21,50 @@ namespace TabularEditor.UI.ModelDiagram
         public string ModelKey { get; set; }
         public string SelectedLayout { get; set; }
         public List<DiagramLayout> Layouts { get; set; } = new List<DiagramLayout>();
+
+        /// <summary>The "All tables" layout, created if missing. Always first.</summary>
+        [JsonIgnore]
+        public DiagramLayout AllTablesLayout
+        {
+            get
+            {
+                var layout = Layouts.FirstOrDefault(l => l.IsAllTables);
+                if (layout == null)
+                {
+                    layout = new DiagramLayout();
+                    Layouts.Insert(0, layout);
+                }
+                return layout;
+            }
+        }
+
+        public DiagramLayout Find(string name) =>
+            Layouts.FirstOrDefault(l => string.Equals(l.Name, name, StringComparison.CurrentCultureIgnoreCase));
+
+        /// <summary>Adds a custom layout named "Layout 1", "Layout 2", ... whichever is free.</summary>
+        public DiagramLayout AddLayout()
+        {
+            _ = AllTablesLayout; // creates it first if missing, so it stays the first layout
+            var n = 1;
+            while (Find("Layout " + n) != null) n++;
+            var layout = new DiagramLayout { Name = "Layout " + n };
+            Layouts.Add(layout);
+            return layout;
+        }
+
+        /// <summary>
+        /// Returns null if the name is acceptable for the layout, otherwise the reason it is not.
+        /// </summary>
+        public string ValidateName(DiagramLayout layout, string name)
+        {
+            if (layout.IsAllTables) return "The \"All tables\" layout cannot be renamed.";
+            if (string.IsNullOrWhiteSpace(name)) return "Enter a name.";
+            var other = Find(name.Trim());
+            if (other != null && other != layout) return $"A layout named \"{other.Name}\" already exists.";
+            return null;
+        }
+
+        public bool Remove(DiagramLayout layout) => !layout.IsAllTables && Layouts.Remove(layout);
     }
 
     internal sealed class DiagramLayout
@@ -31,7 +75,42 @@ namespace TabularEditor.UI.ModelDiagram
         public float Zoom { get; set; } = 1f;
         public float ScrollX { get; set; }
         public float ScrollY { get; set; }
+        /// <summary>
+        /// Saved tables, in drawing order. For "All tables" these are positions only; for a
+        /// custom layout they are also the list of tables it contains.
+        /// </summary>
         public List<DiagramNodeLayout> Nodes { get; set; } = new List<DiagramNodeLayout>();
+
+        [JsonIgnore]
+        public bool IsAllTables => Name == AllTables;
+
+        /// <summary>Whether this layout shows the table. "All tables" shows every table.</summary>
+        public bool Includes(string tableName, string lineageTag) => IsAllTables || Find(tableName, lineageTag) != null;
+
+        /// <summary>
+        /// Adds a table without a position (the diagram places it automatically). Returns false
+        /// if it is already in the layout.
+        /// </summary>
+        public bool Add(string tableName, string lineageTag)
+        {
+            if (Find(tableName, lineageTag) != null) return false;
+            Nodes.Add(new DiagramNodeLayout
+            {
+                Table = tableName,
+                LineageTag = string.IsNullOrEmpty(lineageTag) ? null : lineageTag,
+                X = float.NaN,
+                Y = float.NaN,
+            });
+            return true;
+        }
+
+        /// <summary>Removes a table from a custom layout. The table itself is not touched.</summary>
+        public bool Remove(string tableName, string lineageTag)
+        {
+            if (IsAllTables) return false;
+            var node = Find(tableName, lineageTag);
+            return node != null && Nodes.Remove(node);
+        }
 
         /// <summary>
         /// Finds the saved node for a table: by lineage tag first, so a renamed table keeps its
@@ -52,8 +131,16 @@ namespace TabularEditor.UI.ModelDiagram
     {
         public string Table { get; set; }
         public string LineageTag { get; set; }
+        /// <summary>NaN when the table has not been placed yet.</summary>
         public float X { get; set; }
         public float Y { get; set; }
+        /// <summary>Card size set by the user; 0 means "fit the fields".</summary>
+        public float Width { get; set; }
+        public float Height { get; set; }
+        public bool Collapsed { get; set; }
+
+        [JsonIgnore]
+        public bool IsPlaced => !float.IsNaN(X) && !float.IsNaN(Y);
     }
 
     internal static class DiagramLayoutStore

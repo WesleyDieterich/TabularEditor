@@ -4,6 +4,7 @@ using System.Drawing;
 using System.Globalization;
 using System.Linq;
 using System.Windows.Forms;
+using Aga.Controls.Tree;
 using TabularEditor.TOMWrapper;
 using TabularEditor.UI.Extensions;
 
@@ -11,26 +12,31 @@ namespace TabularEditor.UI.ModelDiagram
 {
     /// <summary>
     /// The "Model Diagram" workspace tab: tables and relationships of the loaded model, kept
-    /// in sync with model changes and with the selection in the model tree.
+    /// in sync with model changes and with the selection in the model tree. "All tables" shows
+    /// every table; custom layouts show the tables added to them.
     /// </summary>
     internal sealed class DiagramView : UserControl
     {
         private const int RebuildDelayMs = 150;
         private const int SaveDelayMs = 800;
+        private const string EmptyLayoutText = "This layout is empty.\nDrag tables here from the model tree.";
+        private const string NoModelText = "No tables to show. Open or connect to a model.";
 
         private readonly Func<TabularModelHandler> getHandler;
         private readonly DiagramCanvas canvas = new DiagramCanvas { Dock = DockStyle.Fill };
         private readonly ToolStrip toolbar = new ToolStrip { GripStyle = ToolStripGripStyle.Hidden, Dock = DockStyle.Top };
-        private readonly ToolStripLabel layoutName = new ToolStripLabel(DiagramLayout.AllTables) { Font = new Font("Segoe UI", 9f, FontStyle.Bold) };
+        private readonly ToolStrip layoutTabs = new ToolStrip { GripStyle = ToolStripGripStyle.Hidden, Dock = DockStyle.Bottom };
         private readonly ToolStripLabel zoomLabel = new ToolStripLabel("100%") { AutoSize = false, Width = 48 };
         private readonly ToolStripTextBox search = new ToolStripTextBox { AutoSize = false, Width = 180 };
         private readonly ToolStripLabel status = new ToolStripLabel { Alignment = ToolStripItemAlignment.Right };
+        private readonly ContextMenuStrip menu = new ContextMenuStrip();
         private readonly Timer rebuildTimer = new Timer { Interval = RebuildDelayMs };
         private readonly Timer saveTimer = new Timer { Interval = SaveDelayMs };
 
         private TabularModelHandler handler;
         private TabularTree tree;
-        private DiagramLayoutFile layoutFile;
+        private DiagramLayoutFile layoutFile = new DiagramLayoutFile();
+        private DiagramLayout layout;
         private bool rebuildPending;
         private bool fitPending;
         private bool syncingSelection;
@@ -39,15 +45,14 @@ namespace TabularEditor.UI.ModelDiagram
         {
             this.getHandler = getHandler;
             Dock = DockStyle.Fill;
+            layout = layoutFile.AllTablesLayout;
 
-            toolbar.Items.Add(layoutName);
-            toolbar.Items.Add(new ToolStripSeparator());
             toolbar.Items.Add(Button("−", "Zoom out (Ctrl+-)", () => canvas.ZoomBy(0.8f)));
             toolbar.Items.Add(zoomLabel);
             toolbar.Items.Add(Button("+", "Zoom in (Ctrl++)", () => canvas.ZoomBy(1.25f)));
             toolbar.Items.Add(Button("Fit", "Fit all tables in the window (Ctrl+0)", () => canvas.FitToWindow()));
             toolbar.Items.Add(new ToolStripSeparator());
-            toolbar.Items.Add(Button("Arrange all", "Place every table automatically, replacing the positions you set", ArrangeAll));
+            toolbar.Items.Add(Button("Arrange all", "Place every table in this layout automatically, replacing the positions you set", ArrangeAll));
             toolbar.Items.Add(new ToolStripSeparator());
             toolbar.Items.Add(search);
             toolbar.Items.Add(status);
@@ -55,11 +60,17 @@ namespace TabularEditor.UI.ModelDiagram
 
             Controls.Add(canvas);
             Controls.Add(toolbar);
+            Controls.Add(layoutTabs);
+            RefreshLayoutTabs();
 
             canvas.ObjectClicked += Canvas_ObjectClicked;
-            canvas.NodesMoved += (s, e) => ScheduleSave();
+            canvas.LayoutChanged += (s, e) => ScheduleSave();
             canvas.ViewChanged += (s, e) => { UpdateZoomLabel(); ScheduleSave(); };
-            canvas.HoverChanged += (s, obj) => status.Text = obj is SingleColumnRelationship r ? Describe(r) : "";
+            canvas.HoverChanged += (s, obj) => status.Text = obj is SingleColumnRelationship r ? Describe(r) : StatusText();
+            canvas.ContextMenuRequested += (s, e) => ShowContextMenu(e.Node, e.Location);
+            canvas.DragEnter += Canvas_DragOver;
+            canvas.DragOver += Canvas_DragOver;
+            canvas.DragDrop += Canvas_DragDrop;
             search.TextChanged += (s, e) => ApplySearch(scrollToFirst: false);
             search.KeyDown += Search_KeyDown;
             rebuildTimer.Tick += (s, e) => { rebuildTimer.Stop(); if (Visible) Rebuild(); };
@@ -74,6 +85,7 @@ namespace TabularEditor.UI.ModelDiagram
                 if (UIController.Current != null) UIController.Current.SelectionChanged -= Tree_SelectionChanged;
                 rebuildTimer.Dispose();
                 saveTimer.Dispose();
+                menu.Dispose();
             };
         }
 
@@ -103,14 +115,8 @@ namespace TabularEditor.UI.ModelDiagram
             }
 
             layoutFile = DiagramLayoutStore.Load(DiagramLayoutStore.GetModelKey(handler)) ?? new DiagramLayoutFile();
-            var layout = CurrentLayout;
-            fitPending = layout.Nodes.Count == 0;
-            canvas.Graph = DiagramGraph.Empty;
-            canvas.Zoom = layout.Zoom;
-            canvas.Scroll = new PointF(layout.ScrollX, layout.ScrollY);
             search.Text = "";
-            rebuildPending = true;
-            if (Visible) Rebuild();
+            ShowLayout(layoutFile.Find(layoutFile.SelectedLayout) ?? layoutFile.AllTablesLayout, save: false);
         }
 
         private void Detach()
@@ -130,19 +136,222 @@ namespace TabularEditor.UI.ModelDiagram
             tree = null;
         }
 
-        private DiagramLayout CurrentLayout
+        #region Layouts
+
+        /// <summary>Switches to a layout, restoring its zoom and scroll position.</summary>
+        private void ShowLayout(DiagramLayout target, bool save = true)
         {
-            get
+            if (save) SaveLayout();
+            layout = target;
+            layoutFile.SelectedLayout = layout.Name;
+            fitPending = !layout.Nodes.Any(n => n.IsPlaced);
+            canvas.Graph = DiagramGraph.Empty;
+            canvas.SelectNodes(Enumerable.Empty<DiagramNode>());
+            canvas.Zoom = layout.Zoom;
+            canvas.Scroll = new PointF(layout.ScrollX, layout.ScrollY);
+            UpdateZoomLabel();
+            RefreshLayoutTabs();
+            rebuildPending = true;
+            if (Visible) Rebuild();
+            if (save) ScheduleSave();
+        }
+
+        private void RefreshLayoutTabs()
+        {
+            layoutTabs.SuspendLayout();
+            layoutTabs.Items.Clear();
+            foreach (var l in layoutFile.Layouts.OrderBy(l => l.IsAllTables ? 0 : 1).ToList())
             {
-                var layout = layoutFile.Layouts.FirstOrDefault(l => l.Name == DiagramLayout.AllTables);
-                if (layout == null)
+                var tab = new ToolStripButton(l.Name)
                 {
-                    layout = new DiagramLayout();
-                    layoutFile.Layouts.Insert(0, layout);
-                }
-                return layout;
+                    Checked = l == layout,
+                    DisplayStyle = ToolStripItemDisplayStyle.Text,
+                    DoubleClickEnabled = !l.IsAllTables,
+                    ToolTipText = l.IsAllTables ? "Every table in the model" : "Double-click to rename. Right-click for more.",
+                };
+                if (l == layout) tab.Font = new Font(layoutTabs.Font, FontStyle.Bold);
+                var target = l;
+                tab.Click += (s, e) => { if (target != layout) ShowLayout(target); };
+                tab.DoubleClick += (s, e) => RenameLayout(target);
+                tab.MouseUp += (s, e) => { if (e.Button == MouseButtons.Right) ShowLayoutTabMenu(target, tab); };
+                layoutTabs.Items.Add(tab);
+            }
+            layoutTabs.Items.Add(Button("+", "New layout (starts with the tables selected in the diagram)", NewLayout));
+            layoutTabs.ResumeLayout();
+        }
+
+        private void ShowLayoutTabMenu(DiagramLayout target, ToolStripItem tab)
+        {
+            menu.Items.Clear();
+            menu.Items.Add("New layout", null, (s, e) => NewLayout());
+            if (!target.IsAllTables)
+            {
+                menu.Items.Add("Rename layout...", null, (s, e) => RenameLayout(target));
+                menu.Items.Add("Delete layout", null, (s, e) => DeleteLayout(target));
+            }
+            AppTheme.ApplyContextMenu(menu);
+            menu.Show(layoutTabs, new Point(tab.Bounds.Left, tab.Bounds.Top), ToolStripDropDownDirection.AboveRight);
+        }
+
+        /// <summary>
+        /// Creates a custom layout holding the tables currently selected in the diagram (or in
+        /// the tree), in their current arrangement, so "select a few tables, click +" gives a
+        /// focused view straight away.
+        /// </summary>
+        private void NewLayout()
+        {
+            var seed = canvas.SelectedNodes.ToList();
+            var created = layoutFile.AddLayout();
+            foreach (var node in seed)
+                created.Nodes.Add(SaveNode(node));
+            created.Zoom = canvas.Zoom;
+            created.ScrollX = canvas.Scroll.X;
+            created.ScrollY = canvas.Scroll.Y;
+            ShowLayout(created);
+            if (seed.Count > 0) canvas.FitToWindow();
+        }
+
+        private void RenameLayout(DiagramLayout target)
+        {
+            if (target.IsAllTables) return;
+            var name = LayoutNameDialog.Ask(FindForm(), "Rename layout", target.Name, n => layoutFile.ValidateName(target, n));
+            if (name == null || name == target.Name) return;
+            target.Name = name;
+            if (target == layout) layoutFile.SelectedLayout = name;
+            RefreshLayoutTabs();
+            ScheduleSave();
+        }
+
+        private void DeleteLayout(DiagramLayout target)
+        {
+            if (target.IsAllTables) return;
+            var answer = AppMessageBox.Show(FindForm(),
+                $"Delete the layout \"{target.Name}\"?\n\nOnly the layout is deleted. The tables stay in the model.",
+                "Delete layout", MessageBoxButtons.OKCancel, MessageBoxIcon.Question);
+            if (answer != DialogResult.OK) return;
+            layoutFile.Remove(target);
+            if (target == layout) ShowLayout(layoutFile.AllTablesLayout);
+            else
+            {
+                RefreshLayoutTabs();
+                ScheduleSave();
             }
         }
+
+        /// <summary>Adds tables to the current custom layout; returns how many were new.</summary>
+        private int AddTables(IEnumerable<Table> tables, PointF? at)
+        {
+            if (layout.IsAllTables) return 0;
+            var added = 0;
+            var position = at;
+            foreach (var table in tables.Distinct())
+            {
+                if (!layout.Add(table.Name, table.LineageTag)) continue;
+                added++;
+                if (position is PointF p)
+                {
+                    // Dropped tables land where they were dropped, side by side.
+                    var node = layout.Find(table.Name, table.LineageTag);
+                    node.X = p.X;
+                    node.Y = p.Y;
+                    position = new PointF(p.X + CardMetrics.Width + AutoLayout.HorizontalGap, p.Y);
+                }
+            }
+            if (added > 0)
+            {
+                Rebuild();
+                ScheduleSave();
+            }
+            return added;
+        }
+
+        private void AddRelatedTables(IEnumerable<DiagramNode> nodes)
+        {
+            var tables = nodes.SelectMany(n => DiagramGraph.RelatedTables(n.Table)).ToList();
+            var added = AddTables(tables, null);
+            UpdateStatus(added == 0 ? "All related tables are already in this layout" : $"Added {added} related table{(added == 1 ? "" : "s")}");
+        }
+
+        private void RemoveFromLayout(IEnumerable<DiagramNode> nodes)
+        {
+            if (layout.IsAllTables) return;
+            // Positions first, so the remaining tables keep any unsaved moves.
+            CaptureNodes();
+            foreach (var node in nodes.ToList()) layout.Remove(node.Table.Name, node.Table.LineageTag);
+            Rebuild();
+            ScheduleSave();
+        }
+
+        #endregion
+
+        #region Context menu
+
+        private void ShowContextMenu(DiagramNode node, Point location)
+        {
+            menu.Items.Clear();
+            var targets = node == null ? new List<DiagramNode>() : canvas.SelectedNodes.ToList();
+            if (node != null && !targets.Contains(node)) targets = new List<DiagramNode> { node };
+
+            if (targets.Count > 0)
+            {
+                var label = targets.Count == 1 ? "" : $" ({targets.Count} tables)";
+                if (targets.Any(n => !n.Collapsed)) menu.Items.Add("Collapse" + label, null, (s, e) => canvas.SetCollapsed(targets, true));
+                if (targets.Any(n => n.Collapsed)) menu.Items.Add("Expand" + label, null, (s, e) => canvas.SetCollapsed(targets, false));
+                if (targets.Any(n => n.HasCustomSize)) menu.Items.Add("Reset size" + label, null, (s, e) => canvas.ResetSize(targets));
+                if (!layout.IsAllTables)
+                {
+                    menu.Items.Add(new ToolStripSeparator());
+                    menu.Items.Add("Add related tables", null, (s, e) => AddRelatedTables(targets));
+                    menu.Items.Add("Remove from layout" + label, null, (s, e) => RemoveFromLayout(targets));
+                }
+                menu.Items.Add(new ToolStripSeparator());
+                menu.Items.Add("New layout with " + (targets.Count == 1 ? "this table" : "these tables"), null, (s, e) =>
+                {
+                    canvas.SelectNodes(targets);
+                    NewLayout();
+                });
+            }
+            else
+            {
+                menu.Items.Add("Fit to window", null, (s, e) => canvas.FitToWindow());
+                menu.Items.Add("Arrange all", null, (s, e) => ArrangeAll());
+                menu.Items.Add("Select all", null, (s, e) => canvas.SelectNodes(canvas.Graph.Nodes));
+                menu.Items.Add(new ToolStripSeparator());
+                menu.Items.Add("New layout", null, (s, e) => NewLayout());
+            }
+            AppTheme.ApplyContextMenu(menu);
+            menu.Show(canvas, location);
+        }
+
+        #endregion
+
+        #region Drag and drop from the model tree
+
+        /// <summary>Tables in a drag that started in the model tree (tables, or anything inside one).</summary>
+        private static List<Table> DraggedTables(IDataObject data)
+        {
+            if (!(data?.GetData(typeof(TreeNodeAdv[])) is TreeNodeAdv[] nodes)) return new List<Table>();
+            return nodes.Select(n => n.Tag).OfType<Table>().Distinct().ToList();
+        }
+
+        private void Canvas_DragOver(object sender, DragEventArgs e)
+        {
+            var tables = DraggedTables(e.Data);
+            var any = !layout.IsAllTables && tables.Any(t => !layout.Includes(t.Name, t.LineageTag));
+            e.Effect = any ? DragDropEffects.Copy : DragDropEffects.None;
+            if (layout.IsAllTables && tables.Count > 0)
+                status.Text = "\"All tables\" already shows every table. Drop on a custom layout.";
+        }
+
+        private void Canvas_DragDrop(object sender, DragEventArgs e)
+        {
+            var tables = DraggedTables(e.Data);
+            var world = canvas.ToWorld(canvas.PointToClient(new Point(e.X, e.Y)));
+            var added = AddTables(tables, world);
+            UpdateStatus(added == 0 ? null : $"Added {added} table{(added == 1 ? "" : "s")}");
+        }
+
+        #endregion
 
         #region Keeping in sync with the model
 
@@ -173,20 +382,32 @@ namespace TabularEditor.UI.ModelDiagram
         {
             rebuildPending = false;
             var model = handler?.Model;
-            var previous = canvas.Graph.Nodes.ToDictionary(n => n.Table, n => n.Location);
-            var graph = DiagramGraph.Build(model);
-            var layout = CurrentLayout;
+            var previous = canvas.Graph.Nodes.ToDictionary(n => n.Table);
+            var graph = DiagramGraph.Build(model, t => layout.Includes(t.Name, t.LineageTag));
 
             var unplaced = new List<DiagramNode>();
             foreach (var node in graph.Nodes)
             {
-                node.Size = new SizeF(DiagramCanvas.CardWidth, DiagramCanvas.CardHeight(node.Fields.Count));
-                if (previous.TryGetValue(node.Table, out var location))
-                    node.Location = location;
-                else if (layout.Find(node.Table.Name, node.Table.LineageTag) is DiagramNodeLayout saved)
-                    node.Location = new PointF(saved.X, saved.Y);
-                else
-                    unplaced.Add(node);
+                var saved = layout.Find(node.Table.Name, node.Table.LineageTag);
+                if (previous.TryGetValue(node.Table, out var before))
+                {
+                    node.Location = before.Location;
+                    node.Collapsed = before.Collapsed;
+                    node.HasCustomSize = before.HasCustomSize;
+                    node.CustomHeight = before.CustomHeight;
+                    node.Size = new SizeF(before.Size.Width, 0);
+                }
+                else if (saved != null)
+                {
+                    node.Collapsed = saved.Collapsed;
+                    node.HasCustomSize = saved.Width > 0 || saved.Height > 0;
+                    node.CustomHeight = saved.Height;
+                    node.Size = new SizeF(saved.Width > 0 ? saved.Width : CardMetrics.Width, 0);
+                    if (saved.IsPlaced) node.Location = new PointF(saved.X, saved.Y);
+                    else unplaced.Add(node);
+                }
+                else unplaced.Add(node);
+                node.FitHeight();
             }
 
             // Restore the saved stacking order: nodes saved later are drawn on top.
@@ -200,8 +421,9 @@ namespace TabularEditor.UI.ModelDiagram
                 graph.BringToFront(node);
 
             AutoLayout.Arrange(graph, unplaced);
+            canvas.EmptyText = model == null ? NoModelText : layout.IsAllTables ? "This model has no tables." : EmptyLayoutText;
             canvas.Graph = graph;
-            canvas.SetSelection(CurrentTreeSelection());
+            canvas.SetSelection(CurrentTreeSelection(), selectTables: false);
             ApplySearch(scrollToFirst: false);
 
             if (fitPending && graph.Nodes.Count > 0)
@@ -232,7 +454,7 @@ namespace TabularEditor.UI.ModelDiagram
         private void Tree_SelectionChanged(object sender, EventArgs e)
         {
             if (syncingSelection || IsDisposed) return;
-            canvas.SetSelection(CurrentTreeSelection());
+            canvas.SetSelection(CurrentTreeSelection(), selectTables: true);
         }
 
         private void Canvas_ObjectClicked(object sender, ITabularNamedObject obj)
@@ -251,7 +473,7 @@ namespace TabularEditor.UI.ModelDiagram
             // Goto may not find a tree node (for example when the tree is filtered); show the
             // click in the diagram regardless.
             var selected = CurrentTreeSelection().ToList();
-            canvas.SetSelection(selected.Contains(obj) ? selected : new List<ITabularNamedObject> { obj });
+            canvas.SetSelection(selected.Contains(obj) ? selected : new List<ITabularNamedObject> { obj }, selectTables: false);
             canvas.Focus();
         }
 
@@ -298,34 +520,51 @@ namespace TabularEditor.UI.ModelDiagram
             saveTimer.Start();
         }
 
+        private static DiagramNodeLayout SaveNode(DiagramNode n) => new DiagramNodeLayout
+        {
+            Table = n.Table.Name,
+            LineageTag = string.IsNullOrEmpty(n.Table.LineageTag) ? null : n.Table.LineageTag,
+            X = n.Location.X,
+            Y = n.Location.Y,
+            Width = n.HasCustomSize ? n.Size.Width : 0,
+            Height = n.HasCustomSize ? n.CustomHeight : 0,
+            Collapsed = n.Collapsed,
+        };
+
         /// <summary>
-        /// Writes every table's position. The model key is worked out at save time, so a model
-        /// saved under a new path keeps its layout from then on.
+        /// Copies the canvas state into the current layout. Entries for tables that are not in
+        /// the model right now are kept: a table removed by mistake and restored with undo comes
+        /// back where it was, and stays in the custom layouts it belonged to.
+        /// </summary>
+        private void CaptureNodes()
+        {
+            var graph = canvas.Graph;
+            if (handler?.Model == null) return;
+            var shown = new HashSet<Table>(graph.Nodes.Select(n => n.Table));
+            var kept = layout.Nodes.Where(saved => !handler.Model.Tables.Any(t =>
+                    (!string.IsNullOrEmpty(saved.LineageTag) && saved.LineageTag == t.LineageTag) ||
+                    string.Equals(saved.Table, t.Name, StringComparison.OrdinalIgnoreCase)))
+                .ToList();
+            // Tables in the model but not yet drawn (a rebuild is pending) keep their saved entry.
+            var pending = layout.Nodes.Where(saved => !kept.Contains(saved) && !graph.Nodes.Any(n =>
+                    (!string.IsNullOrEmpty(saved.LineageTag) && saved.LineageTag == n.Table.LineageTag) ||
+                    string.Equals(saved.Table, n.Table.Name, StringComparison.OrdinalIgnoreCase)))
+                .ToList();
+            layout.Nodes = kept.Concat(pending).Concat(graph.Nodes.Select(SaveNode)).ToList();
+        }
+
+        /// <summary>
+        /// Writes all layouts. The model key is worked out at save time, so a model saved under a
+        /// new path keeps its layouts from then on.
         /// </summary>
         private void SaveLayout()
         {
             saveTimer.Stop();
-            if (layoutFile == null || handler == null) return;
+            if (handler == null) return;
             var key = DiagramLayoutStore.GetModelKey(handler);
             if (key == null) return;
 
-            var layout = CurrentLayout;
-            var graph = canvas.Graph;
-            if (graph.Nodes.Count > 0)
-            {
-                // Keep entries for tables not in the model right now: a table removed by mistake
-                // and restored with undo comes back where it was.
-                var current = new HashSet<string>(graph.Nodes.Select(n => n.Table.Name), StringComparer.OrdinalIgnoreCase);
-                var kept = layout.Nodes.Where(n => !current.Contains(n.Table) &&
-                    !graph.Nodes.Any(g => !string.IsNullOrEmpty(n.LineageTag) && n.LineageTag == g.Table.LineageTag));
-                layout.Nodes = kept.Concat(graph.Nodes.Select(n => new DiagramNodeLayout
-                {
-                    Table = n.Table.Name,
-                    LineageTag = string.IsNullOrEmpty(n.Table.LineageTag) ? null : n.Table.LineageTag,
-                    X = n.Location.X,
-                    Y = n.Location.Y,
-                })).ToList();
-            }
+            if (!rebuildPending) CaptureNodes();
             layout.Zoom = canvas.Zoom;
             layout.ScrollX = canvas.Scroll.X;
             layout.ScrollY = canvas.Scroll.Y;
@@ -339,12 +578,13 @@ namespace TabularEditor.UI.ModelDiagram
 
         private void UpdateZoomLabel() => zoomLabel.Text = Math.Round(canvas.Zoom * 100) + "%";
 
-        private void UpdateStatus(string message = null)
+        private string StatusText()
         {
             var graph = canvas.Graph;
-            status.Text = message ?? (graph.Nodes.Count == 0 ? "" :
-                $"{graph.Nodes.Count} tables, {graph.Edges.Count} relationships");
+            return graph.Nodes.Count == 0 ? "" : $"{graph.Nodes.Count} tables, {graph.Edges.Count} relationships";
         }
+
+        private void UpdateStatus(string message = null) => status.Text = message ?? StatusText();
 
         private static string Describe(SingleColumnRelationship r)
         {
