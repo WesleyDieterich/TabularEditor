@@ -1,6 +1,6 @@
 # Tabular Editor 1.0.1
 
-An independent fork of [Tabular Editor 2](https://github.com/TabularEditor/TabularEditor) for editing Power BI and Analysis Services tabular models. This fork adds a tabbed workspace for writing DAX, inspecting query results, and refreshing connected models.
+An independent fork of [Tabular Editor 2](https://github.com/TabularEditor/TabularEditor) for editing Power BI and Analysis Services tabular models. This fork adds a tabbed workspace for writing DAX, inspecting query results, editing relationships in a model diagram, and refreshing connected models.
 
 ## Download
 
@@ -31,6 +31,16 @@ Right-click a table and choose **Preview Data** to open up to 1,000 rows in **Ex
 ### Filter dump measure
 
 Right-click tables, columns, display folders, hierarchies or levels and open **Filter Dump Measure** to generate a measure that reports which columns are directly filtered (`ISFILTERED`) and lists up to 3 of the values each one keeps (change `__MaxValues` in the generated DAX for more). You can **Add to Model** as an undoable measure or **Define in DAX Query** to insert a query-scoped `DEFINE MEASURE` into the active query tab. **(Selection)** uses the columns you selected (Ctrl+click can pick columns from different tables), and a selected table includes all of its columns, hidden and calculation-group columns too. **(All Tables)** covers every table in the model. The measure returns BLANK when nothing is filtered, so it doesn't add rows to visuals.
+
+![Filter Dump Measure submenu on two selected columns, with the generated DEFINE MEASURE in a DAX Query tab](Documentation/Fork/filter-dump.jpg)
+
+### Model Diagram
+
+The **Model Diagram** tab draws tables as cards and relationships as lines, similar to the model view in Power BI Desktop. Relationship columns are pinned to the top of each card. **All tables** shows the whole model. Custom layouts hold only the tables you add, either by dragging them from the model tree or with **Add related tables**. You can select several cards with Ctrl+click or a Shift+drag box, then move, resize, or collapse them. Layouts and card sizes are saved per model.
+
+Drag a column onto a column in another table to create a relationship, or double-click a line to edit one. The relationship dialog sets cardinality, cross filter direction, active state and security filtering. On a connected model, **Detect from data** sets cardinality from the data. OK is blocked, with an explanation, when a change would create ambiguous filter paths, mismatched data types, or duplicate relationships. Each create, edit, or delete is a single undo step.
+
+![Model Diagram with a custom layout around the cliente table and the Edit relationship dialog open](Documentation/Fork/model-view.jpg)
 
 ### Refresh tables and models
 
