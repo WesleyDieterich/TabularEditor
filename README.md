@@ -48,7 +48,11 @@ On a connected model, right-click a table or the **Model** node and select **Ref
 
 ### Workspace and shortcuts
 
-The workspace includes light and dark themes, DAX autocomplete, and a **Properties** panel scoped to the **Expression Editor**. **Ctrl+S** saves the active script or expression when an editor tab is open and otherwise routes to model save. **Ctrl+W** closes the active tab and warns about unsaved edits where applicable.
+The workspace includes light and dark themes, DAX autocomplete, and a **Properties** panel scoped to the **Expression Editor**. **Ctrl+S** saves the active script when a DAX query or C# script editor has focus; in the Expression Editor it applies the active expression to the model and then saves the model; elsewhere it saves the model, and the save confirmation warns when expression tabs still hold unapplied edits. **Ctrl+Shift+S** (File > Save all) applies every expression tab's edits and then saves the model. **Ctrl+W** closes the active tab and warns about unsaved edits where applicable.
+
+### Color previews in DAX
+
+Hex colors in DAX strings (`"#2B8A3E"`, `"#ABC"`, `"#1C7ED680"`, or inside SVG markup like `fill='#F59F00'`) are shown on a chip of their own color in the **DAX Query** and **Expression Editor**. **Ctrl+click** a color to open a color picker with a saturation/brightness square, a hue bar, and an opacity bar for 8-digit colors. The text updates as you pick and keeps its letter case and length. Click the original color on the right of the header to go back to it, press **Esc** to cancel, or press **Enter** or click elsewhere to keep it. A whole picker session undoes in one step. Turn the previews off under **Preferences > DAX > Editing**.
 
 ## Documentation and license
 

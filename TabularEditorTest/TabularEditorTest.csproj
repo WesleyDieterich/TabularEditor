@@ -91,6 +91,7 @@
   <ItemGroup>
     <Compile Include="BestPracticeAnalyzer\AnalyzerTests.cs" />
     <Compile Include="BestPracticeAnalyzer\FileTests.cs" />
+    <Compile Include="ColorLiteralsTests.cs" />
     <Compile Include="Constants.cs" />
     <Compile Include="ModelDiagramTests.cs" />
     <Compile Include="PreferencesTests.cs" />

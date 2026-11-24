@@ -25,7 +25,7 @@ namespace TabularEditor.UI
             expressionTabStrip.SizeChanged += (sender, args) => SizeExpressionTabStrip();
             UI.FormMain.Disposed += (sender, args) => expressionTabMenu.Dispose();
             var save = expressionTabMenu.Items.Add("Save", null, (sender, args) => SaveExpressionTabs(new[] { expressionMenuTab }));
-            var saveAll = expressionTabMenu.Items.Add("Save all", null, (sender, args) => SaveExpressionTabs(expressionTabs.ToArray()));
+            var saveAll = expressionTabMenu.Items.Add("Save all", null, (sender, args) => ApplyAllExpressionTabs());
             var rename = expressionTabMenu.Items.Add("Rename…", null, (sender, args) => RenameExpressionTab(expressionMenuTab));
             expressionTabMenu.Items.Add(new ToolStripSeparator());
             expressionTabMenu.Items.Add("Close tab", null, (sender, args) => CloseExpressionTab(expressionMenuTab));
@@ -125,10 +125,11 @@ namespace TabularEditor.UI
             SizeExpressionTabStrip();
         }
 
-        private void SaveExpressionTabs(ExpressionTab[] candidates)
+        /// <returns>False when the drafts could not be applied (an error was shown).</returns>
+        private bool SaveExpressionTabs(ExpressionTab[] candidates)
         {
             var pending = candidates.Where(tab => tab.IsDirty).ToArray();
-            if (pending.Length == 0) return;
+            if (pending.Length == 0) return true;
 
             try
             {
@@ -167,7 +168,7 @@ namespace TabularEditor.UI
             catch (Exception error)
             {
                 AppMessageBox.Show(UI.FormMain, error.Message, "Save expressions failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                return;
+                return false;
             }
 
             foreach (var tab in pending)
@@ -180,7 +181,19 @@ namespace TabularEditor.UI
             if (pending.Contains(activeExpressionTab)) ExpressionEditor_SetText();
             SizeExpressionTabStrip();
             UI.StatusLabel.Text = "Expressions applied to the model.";
+            return true;
         }
+
+        /// <summary>
+        /// Applies the drafts of every expression tab whose object still exists. Tabs of deleted objects are
+        /// skipped so one stale tab cannot block the rest.
+        /// </summary>
+        /// <returns>False when the drafts could not be applied (an error was shown).</returns>
+        internal bool ApplyAllExpressionTabs() =>
+            SaveExpressionTabs(expressionTabs.Where(tab => !tab.Object.IsRemoved).ToArray());
+
+        /// <summary>Expression tabs with edits that a model save would leave out.</summary>
+        internal int UnappliedExpressionTabCount => expressionTabs.Count(tab => tab.IsDirty && !tab.Object.IsRemoved);
 
         internal void CloseActiveExpressionTab()
         {

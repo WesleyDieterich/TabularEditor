@@ -243,6 +243,8 @@ namespace TabularEditor.UI
             else syntaxHighlightTimer.Enabled = true;
         }
 
+        internal void ExpressionEditor_RefreshHighlight() => ExpressionEditor_SyntaxHighlight();
+
         public void ExpressionEditor_SwitchToSemicolons()
         {
             if (ExpressionEditor_IsDax)
@@ -397,10 +399,9 @@ namespace TabularEditor.UI
             }
         }
 
-        public void ExpressionEditor_AcceptEdit()
-        {
-            if (activeExpressionTab != null) SaveExpressionTabs(new[] { activeExpressionTab });
-        }
+        /// <returns>False when the active tab's draft could not be applied.</returns>
+        public bool ExpressionEditor_AcceptEdit() =>
+            activeExpressionTab == null || SaveExpressionTabs(new[] { activeExpressionTab });
 
         public bool ExpressionEditor_IsDirty => activeExpressionTab?.Drafts.Count > 0;
     }

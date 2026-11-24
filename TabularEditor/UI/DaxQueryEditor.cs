@@ -86,6 +86,7 @@ namespace TabularEditor.UI
                 editor.VisibleChanged += (sender, args) => { if (editor.Visible) ScheduleHighlight(); };
                 editor.Text = "EVALUATE\r\n";
                 EditorWordWrap.Attach(editor);
+                EditorColorPicker.Attach(editor);
             }
 
             var commands = new ToolStrip { GripStyle = ToolStripGripStyle.Hidden };

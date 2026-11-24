@@ -74,6 +74,7 @@ namespace TabularEditor.UI.Dialogs
             this.btnCancel = new System.Windows.Forms.Button();
             this.toolTip1 = new System.Windows.Forms.ToolTip(this.components);
             this.chkFixup = new System.Windows.Forms.CheckBox();
+            this.chkColorDecorators = new System.Windows.Forms.CheckBox();
             this.chkIgnoreTimestamps = new System.Windows.Forms.CheckBox();
             this.chkIgnoreInfObjects = new System.Windows.Forms.CheckBox();
             this.chkIgnoreInfProps = new System.Windows.Forms.CheckBox();
@@ -242,6 +243,18 @@ namespace TabularEditor.UI.Dialogs
             this.toolTip1.SetToolTip(this.chkFixup, "When this is checked, expressions of Measures, Calculated Columns and Calculated " +
         "Tables will automatically be updated, when an object name is changed.");
             this.chkFixup.UseVisualStyleBackColor = true;
+            // 
+            // chkColorDecorators
+            // 
+            this.chkColorDecorators.AutoSize = true;
+            this.chkColorDecorators.Location = new System.Drawing.Point(9, 61);
+            this.chkColorDecorators.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
+            this.chkColorDecorators.Name = "chkColorDecorators";
+            this.chkColorDecorators.Size = new System.Drawing.Size(330, 24);
+            this.chkColorDecorators.TabIndex = 2;
+            this.chkColorDecorators.Text = "Show hex colors in DAX strings in their color";
+            this.toolTip1.SetToolTip(this.chkColorDecorators, "Draws hex colors such as \"#2B8A3E\" in DAX strings on a chip of that color. Ctrl+click one to open a color picker.");
+            this.chkColorDecorators.UseVisualStyleBackColor = true;
             // 
             // chkIgnoreTimestamps
             // 
@@ -832,11 +845,12 @@ namespace TabularEditor.UI.Dialogs
             this.groupBox3.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
             this.groupBox3.Controls.Add(this.chkFixup);
+            this.groupBox3.Controls.Add(this.chkColorDecorators);
             this.groupBox3.Location = new System.Drawing.Point(9, 9);
             this.groupBox3.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
             this.groupBox3.Name = "groupBox3";
             this.groupBox3.Padding = new System.Windows.Forms.Padding(4, 5, 4, 5);
-            this.groupBox3.Size = new System.Drawing.Size(536, 75);
+            this.groupBox3.Size = new System.Drawing.Size(536, 105);
             this.groupBox3.TabIndex = 4;
             this.groupBox3.TabStop = false;
             this.groupBox3.Text = "Editing";
@@ -1211,7 +1225,7 @@ namespace TabularEditor.UI.Dialogs
             this.groupBox5.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
             this.groupBox5.Controls.Add(this.cmbSeparators);
-            this.groupBox5.Location = new System.Drawing.Point(9, 95);
+            this.groupBox5.Location = new System.Drawing.Point(9, 125);
             this.groupBox5.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
             this.groupBox5.Name = "groupBox5";
             this.groupBox5.Padding = new System.Windows.Forms.Padding(4, 5, 4, 5);
@@ -1866,6 +1880,7 @@ namespace TabularEditor.UI.Dialogs
         private System.Windows.Forms.ToolTip toolTip1;
         private System.Windows.Forms.GroupBox groupBox3;
         private System.Windows.Forms.CheckBox chkFixup;
+        private System.Windows.Forms.CheckBox chkColorDecorators;
         private System.Windows.Forms.TabControl tabControl1;
         private System.Windows.Forms.TabPage tabSerialization;
         private System.Windows.Forms.GroupBox groupBox2;

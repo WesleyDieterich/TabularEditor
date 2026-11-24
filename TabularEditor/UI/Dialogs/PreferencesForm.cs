@@ -243,6 +243,7 @@ namespace TabularEditor.UI.Dialogs
             Preferences.Current.CheckForUpdates = chkAutoUpdate.Checked;
             Preferences.Current.SkipPatchUpdates = chkSkipPatch.Checked;
             Preferences.Current.FormulaFixup = chkFixup.Checked;
+            Preferences.Current.ShowColorDecorators = chkColorDecorators.Checked;
             Preferences.Current.AllowUnsupportedPBIFeatures = chkAllowUnsupportedPBIFeatures.Checked;
             Preferences.Current.ChangeDetectionOnLocalServers = chkChangeDetectionLocalServer.Checked;
             Preferences.Current.UseSemicolonsAsSeparators = cmbSeparators.SelectedIndex == 1;
@@ -350,6 +351,7 @@ namespace TabularEditor.UI.Dialogs
             chkSkipPatch.Enabled = chkAutoUpdate.Checked;
 
             chkFixup.Checked = Preferences.Current.FormulaFixup;
+            chkColorDecorators.Checked = Preferences.Current.ShowColorDecorators;
             cmbSeparators.SelectedIndex = Preferences.Current.UseSemicolonsAsSeparators ? 1 : 0;
             chkAllowUnsupportedPBIFeatures.Checked = Preferences.Current.AllowUnsupportedPBIFeatures;
             chkChangeDetectionLocalServer.Checked = Preferences.Current.ChangeDetectionOnLocalServers;

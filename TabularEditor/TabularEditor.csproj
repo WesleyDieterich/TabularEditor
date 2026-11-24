@@ -298,6 +298,7 @@
     <Compile Include="TextServices\CSharpLexer.cs" />
     <Compile Include="TextServices\DaxCaretContext.cs" />
     <Compile Include="TextServices\DaxFunctionCatalog.cs" />
+    <Compile Include="TextServices\ColorLiterals.cs" />
     <Compile Include="TextServices\ExpressionParser.cs" />
     <Compile Include="UI\DaxIntelliSense.cs" />
     <Compile Include="UI\DaxQueryEditor.cs" />
@@ -306,6 +307,11 @@
     <Compile Include="UI\DaxQueryTabs.cs" />
     <Compile Include="UI\EditorScrollBars.cs" />
     <Compile Include="UI\EditorWordWrap.cs" />
+    <Compile Include="UI\ColorChipStyle.cs" />
+    <Compile Include="UI\ColorPickerPopup.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="UI\EditorColorPicker.cs" />
     <Compile Include="UI\ModelDiagram\AutoLayout.cs" />
     <Compile Include="UI\ModelDiagram\DiagramCanvas.cs">
       <SubType>Component</SubType>

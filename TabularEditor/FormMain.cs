@@ -299,6 +299,7 @@ Selected.Hierarchies.ForEach(item => item.TranslatedDisplayFolders.SetAll(item.D
             EditorWordWrap.Attach(txtAdvanced);
             EditorScrollBars.Attach(txtExpression);
             EditorScrollBars.Attach(txtAdvanced);
+            EditorColorPicker.Attach(txtExpression);
         }
 
         private void ArrangeWorkspaceToolbars()
@@ -316,6 +317,15 @@ Selected.Hierarchies.ForEach(item => item.TranslatedDisplayFolders.SetAll(item.D
             };
             EditorWordWrap.Changed += (sender, args) => wordWrapMenu.Checked = EditorWordWrap.Enabled;
             viewToolStripMenuItem.DropDownItems.Insert(2, wordWrapMenu);
+
+            var saveAllMenu = new ToolStripMenuItem("Save all", null, (sender, args) => SaveAll())
+            {
+                ShortcutKeyDisplayString = "Ctrl+Shift+S",
+                ToolTipText = "Applies all expression tabs to the model, then saves the model"
+            };
+            fileToolStripMenuItem.DropDownItems.Insert(
+                fileToolStripMenuItem.DropDownItems.IndexOf(saveToolStripMenuItem) + 1, saveAllMenu);
+            fileToolStripMenuItem.DropDownOpening += (sender, args) => saveAllMenu.Enabled = UI.Handler != null;
 
             var perspectiveMenu = new ToolStripMenuItem("Perspective");
             perspectiveMenu.DropDownItems.Add(cmbPerspective);
@@ -1000,6 +1010,7 @@ Selected.Hierarchies.ForEach(item => item.TranslatedDisplayFolders.SetAll(item.D
         {
             var usingSemicolons = Preferences.Current.UseSemicolonsAsSeparators;
             var usingDarkTheme = Preferences.Current.UseDarkTheme;
+            var showingColors = Preferences.Current.ShowColorDecorators;
             PreferencesForm.Show(UI.Handler);
             if (usingDarkTheme != Preferences.Current.UseDarkTheme)
             {
@@ -1016,6 +1027,11 @@ Selected.Hierarchies.ForEach(item => item.TranslatedDisplayFolders.SetAll(item.D
                 if (Preferences.Current.UseSemicolonsAsSeparators) UI.ExpressionEditor_SwitchToSemicolons();
                 else UI.ExpressionEditor_SwitchToCommas();
             }
+            else if (showingColors != Preferences.Current.ShowColorDecorators)
+            {
+                UI.ExpressionEditor_RefreshHighlight();
+            }
+            if (showingColors != Preferences.Current.ShowColorDecorators) daxQueryTabs.ApplyTheme();
 
             if (UI.Handler != null) UI.Handler.Settings = Preferences.Current.GetSettings();
         }
@@ -1239,6 +1255,12 @@ Selected.Hierarchies.ForEach(item => item.TranslatedDisplayFolders.SetAll(item.D
                 return true;
             }
 
+            if (keyData == (Keys.Control | Keys.Shift | Keys.S))
+            {
+                SaveAll();
+                return true;
+            }
+
             if (keyData == (Keys.Control | Keys.W))
             {
                 if (tabCodeEditors.SelectedTab == pgExpressionEditor) UI.CloseActiveExpressionTab();
@@ -1314,13 +1336,19 @@ Selected.Hierarchies.ForEach(item => item.TranslatedDisplayFolders.SetAll(item.D
                     btnSaveScript_Click(this, EventArgs.Empty);
                     return;
                 }
-                if (tabCodeEditors.SelectedTab == pgExpressionEditor && UI.ExpressionEditor_Current != null)
-                {
-                    UI.ExpressionEditor_AcceptEdit();
+                // Apply the active expression draft first, then fall through to the model save.
+                if (tabCodeEditors.SelectedTab == pgExpressionEditor && UI.ExpressionEditor_Current != null
+                    && !UI.ExpressionEditor_AcceptEdit())
                     return;
-                }
             }
             if (actSave.Enabled) UI.Save();
+        }
+
+        /// <summary>Applies every expression tab's draft to the model, then saves the model.</summary>
+        private void SaveAll()
+        {
+            if (UI.Handler == null || !UI.ApplyAllExpressionTabs()) return;
+            UI.Save();
         }
 
         private void actFind_UpdateEx(object sender, UpdateExEventArgs e)

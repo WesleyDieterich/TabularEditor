@@ -193,6 +193,7 @@ namespace TabularEditor.TextServices
                 if (textbox.Text != text || Preferences.Current.UseSemicolonsAsSeparators != useSemicolons) return;
                 textbox.SuspendDrawing();
                 textbox.ClearStyle(StyleIndex.All);
+                var showColors = Preferences.Current.ShowColorDecorators;
                 foreach (var tok in tokens)
                 {
                     if (tok.Type == DAXLexer.Eof) break;
@@ -201,6 +202,8 @@ namespace TabularEditor.TextServices
                     else if (tok.Channel == DAXLexer.COMMENTS_CHANNEL) range.SetStyle(CommentStyle);
                     else switch (tok.Type)
                         {
+                            case DAXLexer.STRING_LITERAL when showColors:
+                                HighlightString(textbox, text, tok); break;
                             case DAXLexer.INTEGER_LITERAL:
                             case DAXLexer.REAL_LITERAL:
                             case DAXLexer.STRING_LITERAL:
@@ -216,6 +219,19 @@ namespace TabularEditor.TextServices
             }));
 
             return tokens;
+        }
+
+        /// <summary>Styles a string literal, drawing the hex colors in it on a chip of that color.</summary>
+        private static void HighlightString(FastColoredTextBox textbox, string text, IToken token)
+        {
+            var next = token.StartIndex;
+            foreach (var (start, length) in ColorLiterals.Find(text, token.StartIndex, token.StopIndex + 1 - token.StartIndex))
+            {
+                if (start > next) textbox.GetRange(next, start).SetStyle(LiteralStyle);
+                textbox.GetRange(start, start + length).SetStyle(ColorChipStyle.Instance);
+                next = start + length;
+            }
+            if (next <= token.StopIndex) textbox.GetRange(next, token.StopIndex + 1).SetStyle(LiteralStyle);
         }
 
         public static Brush FromHex(string hex)

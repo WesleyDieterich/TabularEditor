@@ -448,7 +448,14 @@ namespace TabularEditor.UI
         {
             if (Handler == null) return false;
             var destination = File_SaveMode == ModelSourceType.Database ? "the connected model" : "the model";
-            return AppMessageBox.Show(UI.FormMain, $"You are about to save changes to {destination}. Continue?",
+            var message = $"You are about to save changes to {destination}. Continue?";
+            var unapplied = UnappliedExpressionTabCount;
+            if (unapplied > 0)
+                message = (unapplied == 1
+                    ? "1 expression tab has edits that are not applied to the model and will not be saved."
+                    : $"{unapplied} expression tabs have edits that are not applied to the model and will not be saved.")
+                    + " Use Save all (Ctrl+Shift+S) to include them.\r\n\r\n" + message;
+            return AppMessageBox.Show(UI.FormMain, message,
                 "Save model", MessageBoxButtons.YesNo, MessageBoxIcon.Warning,
                 MessageBoxDefaultButton.Button2) == DialogResult.Yes;
         }
