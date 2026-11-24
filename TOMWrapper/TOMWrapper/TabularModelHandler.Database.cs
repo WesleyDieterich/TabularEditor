@@ -40,6 +40,23 @@ namespace TabularEditor.TOMWrapper
             Version = versioninfo.DatabaseVersion;
         }
 
+        internal string[] GetTablesPendingCalculation()
+        {
+            using (var server = new TOM.Server())
+            {
+                server.Connect(GetQueryConnectionString(database.Name));
+                var savedDatabase = server.Databases[database.ID];
+                return GetObjectsNotReady(savedDatabase)
+                    .Where(item => item.Item2 == TOM.ObjectState.CalculationNeeded ||
+                        item.Item2 == TOM.ObjectState.NoData || item.Item2 == TOM.ObjectState.Incomplete)
+                    .Select(item => (item.Item1 as TOM.Partition)?.Table?.Name ?? (item.Item1 as TOM.Column)?.Table?.Name)
+                    .Where(name => name != null)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .OrderBy(name => name, StringComparer.CurrentCultureIgnoreCase)
+                    .ToArray();
+            }
+        }
+
         public void KeepAlive()
         {
             if (database?.Server != null) {

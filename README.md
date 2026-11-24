@@ -1,12 +1,12 @@
-# Tabular Editor 1.0.1
+# Tabular Editor 1.0.2
 
 An independent fork of [Tabular Editor 2](https://github.com/TabularEditor/TabularEditor) for editing Power BI and Analysis Services tabular models. This fork adds a tabbed workspace for writing DAX, inspecting query results, editing relationships in a model diagram, and refreshing connected models.
 
 ## Download
 
-- [Portable ZIP](https://github.com/WesleyDieterich/TabularEditor/releases/download/v1.0.1/TabularEditor.1.0.1.Portable.zip) — extract the archive and run `TabularEditor.exe`.
-- [Windows installer (MSI)](https://github.com/WesleyDieterich/TabularEditor/releases/download/v1.0.1/TabularEditor.1.0.1.Installer.msi)
-- [Release notes and SHA-256 checksums](https://github.com/WesleyDieterich/TabularEditor/releases/tag/v1.0.1)
+- [Portable ZIP](https://github.com/WesleyDieterich/TabularEditor/releases/download/v1.0.2/TabularEditor.1.0.2.Portable.zip) — extract the archive and run `TabularEditor.exe`.
+- [Windows installer (MSI)](https://github.com/WesleyDieterich/TabularEditor/releases/download/v1.0.2/TabularEditor.1.0.2.Installer.msi)
+- [Release notes and SHA-256 checksums](https://github.com/WesleyDieterich/TabularEditor/releases/tag/v1.0.2)
 
 The fork's downloads are unsigned. If a 2.x MSI installation is already present, uninstall it before installing this version with the MSI.
 
@@ -28,6 +28,10 @@ Open multiple model expressions and switch between them without losing edits. Ta
 
 Right-click a table and choose **Preview Data** to open up to 1,000 rows in **Explore Data**, with one pinnable tab per table. Both **Explore Data** and **DAX Query** use a results grid with automatically sized columns, data-type icons, per-column filters, and Excel export. Filters open in **Basic** mode. **Advanced** date filters include a calendar picker.
 
+### Pivot Table
+
+Build a matrix from a connected model by adding fields to **Rows**, **Columns**, **Filters**, and **Measures**. Search by typing abbreviated field names, drag to reorder fields, and edit filters via the pencil beside each filter. The matrix uses grouped headers, model formatting, and each field's **Sort By Column**. Use **Use local measure expressions** to test edits applied in the editor before saving them to the service.
+
 ### Filter dump measure
 
 Right-click tables, columns, display folders, hierarchies or levels and open **Filter Dump Measure** to generate a measure that reports which columns are directly filtered (`ISFILTERED`) and lists up to 3 of the values each one keeps (change `__MaxValues` in the generated DAX for more). You can **Add to Model** as an undoable measure or **Define in DAX Query** to insert a query-scoped `DEFINE MEASURE` into the active query tab. **(Selection)** uses the columns you selected (Ctrl+click can pick columns from different tables), and a selected table includes all of its columns, hidden and calculation-group columns too. **(All Tables)** covers every table in the model. The measure returns BLANK when nothing is filtered, so it doesn't add rows to visuals.
@@ -44,7 +48,7 @@ Drag a column onto a column in another table to create a relationship, or double
 
 ### Refresh tables and models
 
-On a connected model, right-click a table or the **Model** node and select **Refresh Data**. Choose a refresh type such as **Full**, **Calculate**, or **Only Data**. **Refresh History** shows the target, status, elapsed time, and any error details. **Explore Data** and **Refresh History** are visible while they have content open.
+On a connected model, right-click a table or the **Model** node and select **Refresh Data**. Choose a refresh type such as **Full**, **Calculate**, or **Only Data**. After saving a connected model, the editor can offer to run **Calculate** for tables with pending objects. **Refresh History** is always visible and keeps a local record of runs started by the editor across models and sessions. Select **Details…** on a run to see its timings, server messages, and TMSL command.
 
 ### Workspace and shortcuts
 
