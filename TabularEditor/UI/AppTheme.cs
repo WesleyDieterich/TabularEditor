@@ -381,22 +381,31 @@ namespace TabularEditor.UI
                     if (input.BorderStyle == BorderStyle.Fixed3D)
                         Set(input.BorderStyle, value => input.BorderStyle = value, BorderStyle.FixedSingle);
                     if (input is TextBox text && text.Multiline && text.ScrollBars != ScrollBars.None)
-                    {
-                        EventHandler applyScrollTheme = (sender, args) => SetWindowTheme(text.Handle, "DarkMode_Explorer", null);
-                        text.HandleCreated += applyScrollTheme;
-                        if (text.IsHandleCreated) applyScrollTheme(text, EventArgs.Empty);
-                        restore.Add(() =>
-                        {
-                            text.HandleCreated -= applyScrollTheme;
-                            if (text.IsHandleCreated) SetWindowTheme(text.Handle, null, null);
-                        });
-                    }
+                        ApplyNativeScrollTheme(text);
+                }
+                else if (control is ListBox list)
+                {
+                    if (list.BorderStyle == BorderStyle.Fixed3D)
+                        Set(list.BorderStyle, value => list.BorderStyle = value, BorderStyle.FixedSingle);
+                    ApplyNativeScrollTheme(list);
                 }
                 else if (control is ScrollBar scrollBar)
                 {
                     var chrome = new DarkScrollBar(scrollBar);
                     restore.Add(chrome.Dispose);
                 }
+            }
+
+            private void ApplyNativeScrollTheme(Control control)
+            {
+                EventHandler applyScrollTheme = (sender, args) => SetWindowTheme(control.Handle, "DarkMode_Explorer", null);
+                control.HandleCreated += applyScrollTheme;
+                if (control.IsHandleCreated) applyScrollTheme(control, EventArgs.Empty);
+                restore.Add(() =>
+                {
+                    control.HandleCreated -= applyScrollTheme;
+                    if (control.IsHandleCreated) SetWindowTheme(control.Handle, null, null);
+                });
             }
 
             private void ApplyNestedScrollBars(Control parent)

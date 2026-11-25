@@ -19,6 +19,14 @@ namespace TabularEditor.UI
             if (editor == null) return;
             Point? pressedAt = null;
 
+            editor.ToolTipNeeded += (sender, args) =>
+            {
+                if (!editor.Enabled || editor.ReadOnly) return;
+                var point = editor.PointToClient(Control.MousePosition);
+                if (editor.ClientRectangle.Contains(point) && TryGetColorAt(editor, point, out _))
+                    args.ToolTipText = "Ctrl+click to open the color picker";
+            };
+
             editor.MouseDown += (sender, args) =>
                 pressedAt = args.Button == MouseButtons.Left && CtrlOnly ? args.Location : (Point?)null;
 

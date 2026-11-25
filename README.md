@@ -1,12 +1,12 @@
-# Tabular Editor 1.0.2
+# Tabular Editor 1.1.0
 
 An independent fork of [Tabular Editor 2](https://github.com/TabularEditor/TabularEditor) for editing Power BI and Analysis Services tabular models. This fork adds a tabbed workspace for writing DAX, inspecting query results, editing relationships in a model diagram, and refreshing connected models.
 
 ## Download
 
-- [Portable ZIP](https://github.com/WesleyDieterich/TabularEditor/releases/download/v1.0.2/TabularEditor.1.0.2.Portable.zip) — extract the archive and run `TabularEditor.exe`.
-- [Windows installer (MSI)](https://github.com/WesleyDieterich/TabularEditor/releases/download/v1.0.2/TabularEditor.1.0.2.Installer.msi)
-- [Release notes and SHA-256 checksums](https://github.com/WesleyDieterich/TabularEditor/releases/tag/v1.0.2)
+- [Portable ZIP](https://github.com/WesleyDieterich/TabularEditor/releases/download/v1.1.0/TabularEditor.1.1.0.Portable.zip) — extract the archive and run `TabularEditor.exe`.
+- [Windows installer (MSI)](https://github.com/WesleyDieterich/TabularEditor/releases/download/v1.1.0/TabularEditor.1.1.0.Installer.msi)
+- [Release notes and SHA-256 checksums](https://github.com/WesleyDieterich/TabularEditor/releases/tag/v1.1.0)
 
 The fork's downloads are unsigned. If a 2.x MSI installation is already present, uninstall it before installing this version with the MSI.
 

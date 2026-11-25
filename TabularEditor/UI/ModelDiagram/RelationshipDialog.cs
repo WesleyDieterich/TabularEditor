@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Windows.Forms;
@@ -16,10 +17,10 @@ namespace TabularEditor.UI.ModelDiagram
     {
         private readonly TabularModelHandler handler;
         private readonly SingleColumnRelationship editing;
-        private readonly ComboBox table1 = DropDown();
-        private readonly ComboBox column1 = DropDown();
-        private readonly ComboBox table2 = DropDown();
-        private readonly ComboBox column2 = DropDown();
+        private readonly SearchDropDown table1 = new SearchDropDown("From table");
+        private readonly SearchDropDown column1 = new SearchDropDown("From column");
+        private readonly SearchDropDown table2 = new SearchDropDown("To table");
+        private readonly SearchDropDown column2 = new SearchDropDown("To column");
         private readonly ComboBox cardinality = DropDown();
         private readonly ComboBox crossFilter = DropDown();
         private readonly CheckBox active = new CheckBox { Text = "Make this relationship active", AutoSize = true };
@@ -92,15 +93,17 @@ namespace TabularEditor.UI.ModelDiagram
             CancelButton = cancel;
 
             var tables = handler.Model.Tables.OrderBy(t => t.Name, StringComparer.CurrentCultureIgnoreCase).Cast<object>().ToArray();
-            table1.Items.AddRange(tables);
-            table2.Items.AddRange(tables);
-            table1.DisplayMember = table2.DisplayMember = column1.DisplayMember = column2.DisplayMember = "Name";
+            table1.Options = table2.Options = tables;
+            foreach (var field in new[] { table1, column1, table2, column2 })
+                field.Height = crossFilter.PreferredHeight;
             cardinality.Items.AddRange(Cardinalities.Select(c => (object)c.Text).ToArray());
             crossFilter.Items.AddRange(new object[] { "Single", "Both" });
 
-            table1.SelectedIndexChanged += (s, e) => FillColumns(table1, column1);
-            table2.SelectedIndexChanged += (s, e) => FillColumns(table2, column2);
-            foreach (var c in new[] { column1, column2, cardinality, crossFilter })
+            table1.SelectionChanged += (s, e) => FillColumns(table1, column1);
+            table2.SelectionChanged += (s, e) => FillColumns(table2, column2);
+            foreach (var c in new[] { column1, column2 })
+                c.SelectionChanged += (s, e) => OnChanged();
+            foreach (var c in new[] { cardinality, crossFilter })
                 c.SelectedIndexChanged += (s, e) => OnChanged();
             foreach (var c in new[] { active, securityBoth, referentialIntegrity })
                 c.CheckedChanged += (s, e) => OnChanged();
@@ -137,13 +140,12 @@ namespace TabularEditor.UI.ModelDiagram
             OnChanged();
         }
 
-        private void FillColumns(ComboBox tableBox, ComboBox columnBox)
+        private void FillColumns(SearchDropDown tableBox, SearchDropDown columnBox)
         {
-            var previous = columnBox.SelectedItem as Column;
-            columnBox.Items.Clear();
-            if (tableBox.SelectedItem is Table table)
-                columnBox.Items.AddRange(table.Columns.OrderBy(c => c.Name, StringComparer.CurrentCultureIgnoreCase).Cast<object>().ToArray());
-            if (previous != null && columnBox.Items.Contains(previous)) columnBox.SelectedItem = previous;
+            columnBox.Options = tableBox.SelectedItem is Table table
+                ? table.Columns.OrderBy(c => c.Name, StringComparer.CurrentCultureIgnoreCase).Cast<object>().ToArray()
+                : Array.Empty<object>();
+            if (!columnBox.Options.Contains(columnBox.SelectedItem)) columnBox.SelectedItem = null;
             OnChanged();
         }
 
@@ -227,6 +229,136 @@ namespace TabularEditor.UI.ModelDiagram
             if (currentError != null) return; // OnChanged shows the reason
             Result = Current();
             DialogResult = DialogResult.OK;
+        }
+
+        private sealed class SearchDropDown : Button
+        {
+            private object selectedItem;
+            internal object[] Options { get; set; } = Array.Empty<object>();
+            internal event EventHandler SelectionChanged;
+
+            internal SearchDropDown(string accessibleName)
+            {
+                AccessibleName = accessibleName;
+                TextAlign = ContentAlignment.MiddleLeft;
+                AutoEllipsis = true;
+                UseMnemonic = false;
+                Padding = new Padding(2, 0, 18, 0);
+            }
+
+            internal object SelectedItem
+            {
+                get => selectedItem;
+                set
+                {
+                    if (ReferenceEquals(selectedItem, value)) return;
+                    selectedItem = value;
+                    Text = OptionName(value);
+                    SelectionChanged?.Invoke(this, EventArgs.Empty);
+                }
+            }
+
+            private static string OptionName(object item) =>
+                item is Table table ? table.Name : (item as Column)?.Name ?? string.Empty;
+
+            protected override void OnPaint(PaintEventArgs e)
+            {
+                base.OnPaint(e);
+                using (var pen = new Pen(ForeColor))
+                {
+                    var x = Width - 12;
+                    var y = Height / 2;
+                    e.Graphics.DrawLines(pen, new[] { new Point(x - 3, y - 1), new Point(x, y + 2), new Point(x + 3, y - 1) });
+                }
+            }
+
+            protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+            {
+                if (keyData != Keys.F4 && keyData != (Keys.Alt | Keys.Down))
+                    return base.ProcessCmdKey(ref msg, keyData);
+                OnClick(EventArgs.Empty);
+                return true;
+            }
+
+            protected override void OnClick(EventArgs e)
+            {
+                base.OnClick(e);
+                var search = new TextBox { Dock = DockStyle.Top, AccessibleName = "Search " + AccessibleName.ToLowerInvariant() };
+                var label = new Label { Text = "Search", Dock = DockStyle.Top, Height = Font.Height + 4 };
+                var results = new ListBox { Dock = DockStyle.Fill, IntegralHeight = false, DisplayMember = "Name", AccessibleName = AccessibleName + " results" };
+                var panel = new Panel { Font = Font, Size = new Size(Width, Font.Height * 12), Padding = new Padding(4) };
+                panel.Controls.Add(results);
+                panel.Controls.Add(search);
+                panel.Controls.Add(label);
+                AppTheme.ApplyWorkspaceControl(panel);
+
+                var popup = new ToolStripDropDown { Padding = Padding.Empty };
+                popup.Items.Add(new ToolStripControlHost(panel) { AutoSize = false, Size = panel.Size, Margin = Padding.Empty });
+                AppTheme.ApplyContextMenu(popup);
+
+                void Filter()
+                {
+                    var comparison = CultureInfo.CurrentCulture.CompareInfo;
+                    var query = search.Text.Trim();
+                    results.BeginUpdate();
+                    results.Items.Clear();
+                    results.Items.AddRange(Options.Where(item => comparison.IndexOf(OptionName(item), query,
+                        CompareOptions.IgnoreCase | CompareOptions.IgnoreNonSpace) >= 0).ToArray());
+                    var currentIndex = selectedItem == null ? -1 : results.Items.IndexOf(selectedItem);
+                    results.SelectedIndex = currentIndex >= 0 ? currentIndex : results.Items.Count > 0 ? 0 : -1;
+                    results.EndUpdate();
+                }
+
+                void Choose()
+                {
+                    if (results.SelectedItem == null) return;
+                    SelectedItem = results.SelectedItem;
+                    popup.Close();
+                    Focus();
+                }
+
+                void HandleKey(object sender, KeyEventArgs args)
+                {
+                    if (args.KeyCode == Keys.Enter) Choose();
+                    else if (args.KeyCode == Keys.Escape)
+                    {
+                        popup.Close();
+                        Focus();
+                    }
+                    else if (sender == search && args.KeyCode == Keys.Down && results.Items.Count > 0)
+                        results.Focus();
+                    else if (sender == results && args.KeyCode == Keys.Up && results.SelectedIndex == 0)
+                        search.Focus();
+                    else return;
+                    args.SuppressKeyPress = true;
+                }
+
+                search.TextChanged += (sender, args) => Filter();
+                void ForwardPopupKeys(object sender, PreviewKeyDownEventArgs args)
+                {
+                    if (args.KeyCode == Keys.Enter || args.KeyCode == Keys.Escape ||
+                        (sender == search && args.KeyCode == Keys.Down))
+                        args.IsInputKey = true;
+                }
+                search.PreviewKeyDown += ForwardPopupKeys;
+                results.PreviewKeyDown += ForwardPopupKeys;
+                search.KeyDown += HandleKey;
+                results.KeyDown += HandleKey;
+                results.MouseClick += (sender, args) =>
+                {
+                    var index = results.IndexFromPoint(args.Location);
+                    if (args.Button != MouseButtons.Left || index < 0) return;
+                    results.SelectedIndex = index;
+                    Choose();
+                };
+                popup.Closed += (sender, args) => BeginInvoke(new Action(popup.Dispose));
+                Filter();
+                var below = PointToScreen(new Point(0, Height));
+                var direction = below.Y + panel.Height <= Screen.FromControl(this).WorkingArea.Bottom
+                    ? ToolStripDropDownDirection.BelowRight : ToolStripDropDownDirection.AboveRight;
+                popup.Show(this, new Point(0, direction == ToolStripDropDownDirection.BelowRight ? Height : 0), direction);
+                search.Focus();
+            }
         }
     }
 }
